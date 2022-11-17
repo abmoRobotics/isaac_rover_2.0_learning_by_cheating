@@ -22,20 +22,20 @@ class Trainer():
         
         h = model.belief_encoder.init_hidden(self.BATCH_SIZE).to(self.DEVICE)
         
-        for batch_idx, (data, targets_ac, targets_ex) in enumerate(loop):
+        for batch_idx, (data, targets) in enumerate(loop):
             data = data.to(device=self.DEVICE)
 
             #TODO format target to be in the correct format
-            targets_ac = targets_ac.float().to(device=self.DEVICE)
-            targets_ex = targets_ex.float().to(device=self.DEVICE)
-
+            targets = targets.float().to(device=self.DEVICE)
+            
             # forward
             with torch.cuda.amp.autocast():
-                actions, predictions = model(data,h)
-                loss_be = loss_fn["behaviour"](actions, targets_ac)
-                loss_re = loss_fn["recontruction"](predictions, targets_ex)
-                loss = loss_be + (0.5 * loss_re)
-                
+                predictions = model(data,h)
+                print(predictions)
+                print(targets)
+                loss_re = loss_fn["behaviour"](predictions, targets)
+                loss_be = loss_fn["recontruction"](predictions, targets)
+                loss = loss_be + 0.5 * loss_re
 
             # backward
             optimizer.zero_grad()
@@ -49,19 +49,15 @@ class Trainer():
         return total_loss
 
     def train(self):
-
-        train_ds = TeacherDataset("data/")
-        train_loader = DataLoader(train_ds,batch_size=self.BATCH_SIZE,num_workers=4,pin_memory=True, shuffle=False)
-
-        model = Student(train_ds.get_info()).to(self.DEVICE)
+        model = Student().to(self.DEVICE)
         loss_fn = {
             "behaviour":  nn.MSELoss(),
-            "recontruction": nn.MSELoss(reduction="mean")
+            "recontruction": nn.MSELoss()
         }
         optimizer = optim.Adam(model.parameters(), lr=self.LEARNING_RATE)
         scaler = torch.cuda.amp.GradScaler()
-
-
+        train_ds = TeacherDataset("data/")
+        train_loader = DataLoader(train_ds,batch_size=self.BATCH_SIZE,num_workers=4,pin_memory=True, shuffle=False)
         max_score = 0
 
         for epoch in range(0,self.NUM_EPOCHS):
