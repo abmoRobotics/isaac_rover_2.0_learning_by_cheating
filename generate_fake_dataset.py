@@ -9,4 +9,3 @@ for i in range(4):
                      "exteroceptive": 1913},
             "data": a}
     torch.save(data, "data/"+str(i) + ".pt")
-

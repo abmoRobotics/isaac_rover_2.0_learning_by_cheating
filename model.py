@@ -35,6 +35,8 @@ class Encoder(nn.Module):
     def forward(self, x):
         
         for layer in self.encoder:
+            print(layer)
+            print("her")
             x = layer(x)
         
         return x
@@ -68,15 +70,15 @@ class Belief_Encoder(nn.Module):
 
         self.ga.append(nn.Sigmoid())
 
-
-
     def forward(self, p, l_e, h):
+        print(h)
         # p = proprioceptive
         # e = exteroceptive
         # h = hidden state
         # x = input data, h = hidden state
         #p = p.squeeze()
         #l_e = l_e.squeeze()
+        #print(torch.stack(p,l_e).shape) 
         x = torch.cat((p,l_e),dim=2)
         #x = self.encoder(x)
         out, h = self.gru(x, h)
@@ -133,6 +135,8 @@ class Belief_Decoder(nn.Module):
 
         for layer in self.decoder:
             decoded = layer(decoded)
+        print(e.shape)
+        print(gate.shape)
         x = e*gate
         x = x + decoded
         return x
@@ -191,6 +195,7 @@ class Student(nn.Module):
         actions = x[:,:,n_re:n_re+n_ac]
         proprioceptive = x[:,:,n_re+n_ac:n_re+n_ac+n_pr]
         exteroceptive = x[:,:,n_re+n_ac+n_pr:]
+        print(x.shape)
         # n_p = self.n_p
         
         # p = x[:,:,0:n_p]        # Extract proprioceptive information  
@@ -198,6 +203,7 @@ class Student(nn.Module):
         # e = x[:,:,n_p:1084]         # Extract exteroceptive information
         
         e_l = self.encoder(exteroceptive) # Pass exteroceptive information through encoder
+        print("her")
         belief, h = self.belief_encoder(proprioceptive,e_l,h) # extract belief state
         
         estimated = self.belief_decoder(exteroceptive,h)
