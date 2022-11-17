@@ -1,6 +1,5 @@
-import random
-
 from torch.utils.data import Dataset
+import random
 from utils import sort_data
 import torch
 
@@ -15,34 +14,35 @@ class TeacherDataset(Dataset):
     
     def __getitem__(self, index):
         max_delay = 5
-        gt = self.data[:, index]
+        info = self.get_info()
+        gt = self.data["data"][:, index]
         data = self.add_noise(gt)
         # shift actions to simulate random delay for whole rover
         delay = random.randint(0, max_delay)
-        actions_delayed = torch.roll(data[:, 0:2], delay, 0)
+        re, ac, ex = info["reset"], info["actions"], info["exteroceptive"]
+        actions_delayed = torch.roll(data[:, re:re + ac], delay, 0)
         actions_delayed = actions_delayed[max_delay:, :]
         data = data[max_delay:, :]
-        data[:, 0:2] = actions_delayed
+        data[:, re:re + ac] = actions_delayed
         gt = gt[max_delay:, :]
-        gt_ac = gt[:, 0:2]
-        gt_ex = gt[:, 3:]
+        gt_ac = gt[:, re:re + ac]
+        gt_ex = gt[:, -ex:]
         return data, gt_ac, gt_ex
-
 
     def add_noise(self, gt):
         noisy_data = gt.clone()
         # dist2goal
         noise = self.create_rand_tensor(2.0, noisy_data[:, 2].shape)
-        noisy_data[:,2] = torch.add(noisy_data[:, 2], noise)
+        noisy_data[:, 2] = torch.add(noisy_data[:, 2], noise)
         # heading2goal
         noise = self.create_rand_tensor(2.0, noisy_data[:, 3].shape)
-        noisy_data[:, 3] += torch.add(noisy_data[:,3], noise)
+        noisy_data[:, 3] += torch.add(noisy_data[:, 3], noise)
         # linear velocity (6?)
         noise = self.create_rand_tensor(3.0, noisy_data[:, 4].shape)
-        noisy_data[:, 4] += torch.add(noisy_data[:,4], noise)
+        noisy_data[:, 4] += torch.add(noisy_data[:, 4], noise)
         # angular velocity (4?)
         noise = self.create_rand_tensor(3.0, noisy_data[:, 5].shape)
-        noisy_data[:, 5] += torch.add(noisy_data[:,5], noise)
+        noisy_data[:, 5] += torch.add(noisy_data[:, 5], noise)
         # heightmap
         noise_mode = self.get_noise_mode()
         noise = self.create_rand_tensor(noise_mode["dev"],
@@ -53,9 +53,9 @@ class TeacherDataset(Dataset):
                                         offset_dev=noise_mode["offset_dev"])
         noisy_data[:, 6:] += torch.add(noisy_data[:, 6:], noise)
         if noise_mode["is_missing_points"]:
-            noisy_data[:, 6:] = self.simulate_missing_height_points(noisy_data[:, 6:], noise_mode["missing_points_prob"])
+            noisy_data[:, 6:] = self.simulate_missing_height_points(noisy_data[:, 6:],
+                                                                    noise_mode["missing_points_prob"])
         return noisy_data
-
 
     def get_noise_mode(self):
         noise_mode = {}
@@ -89,16 +89,15 @@ class TeacherDataset(Dataset):
             noise_mode["missing_points_prob"] = 0.1
         return noise_mode
 
-
-    def create_rand_tensor(self, dev, shape, add_offset=False, offset = 0, is_offset_dev = False, offset_dev = 0.0):
+    def create_rand_tensor(self, dev, shape, add_offset=False, offset=0, is_offset_dev=False, offset_dev=0.0):
         # not possible to move height points on xy plane
         rand = torch.rand(shape)
-        rand = torch.multiply(rand, dev*2)
+        rand = torch.multiply(rand, dev * 2)
         rand = torch.subtract(rand, dev)
         if add_offset:
             if is_offset_dev:
                 offset = torch.rand(shape)
-                offset = torch.multiply(offset, offset_dev*2)
+                offset = torch.multiply(offset, offset_dev * 2)
                 offset = torch.subtract(offset, dev)
                 torch.add(rand, offset)
             else:
