@@ -21,10 +21,13 @@ class Layer(nn.Module):
 
 class Encoder(nn.Module):
     def __init__(
-            self, exteroceptive=1080, activation_function="leakyrelu", encoder_features=[80,60]):
+            self, info, cfg):
         super(Encoder,self).__init__()
+        encoder_features = cfg["encoder_features"]
+        activation_function = cfg["activation_function"]
+        
         self.encoder = nn.ModuleList() 
-        in_channels = exteroceptive
+        in_channels = info["exteroceptive"]
         for feature in encoder_features:
             self.encoder.append(Layer(in_channels, feature, activation_function))
             in_channels = feature
@@ -38,25 +41,27 @@ class Encoder(nn.Module):
 
 class Belief_Encoder(nn.Module):
     def __init__(
-            self, proprioceptive=4, input_dim=60, hidden_dim=50,n_layers=2,activation_function="leakyrelu"):
+            self, info, cfg, input_dim=60):
         super(Belief_Encoder,self).__init__()
-        self.hidden_dim = hidden_dim
-        self.n_layers = n_layers
+        self.hidden_dim = cfg["hidden_dim"]
+        self.n_layers = cfg["n_layers"]
+        activation_function = cfg["activation_function"]
+        proprioceptive = info["proprioceptive"]
         input_dim = proprioceptive+input_dim
         
 
-        self.gru = nn.GRU(input_dim, hidden_dim, n_layers, batch_first=True)
+        self.gru = nn.GRU(input_dim, self.hidden_dim, self.n_layers, batch_first=True)
         self.gb = nn.ModuleList()
         self.ga = nn.ModuleList()
         gb_features = [64,64,60]
         ga_features = [64,64,60]
 
-        in_channels = hidden_dim
+        in_channels = self.hidden_dim
         for feature in gb_features:
             self.gb.append(Layer(in_channels, feature, activation_function))
             in_channels = feature
         
-        in_channels = hidden_dim
+        in_channels = self.hidden_dim
         for feature in ga_features:
             self.ga.append(Layer(in_channels, feature, activation_function))
             in_channels = feature
@@ -95,8 +100,9 @@ class Belief_Encoder(nn.Module):
 
 class Belief_Decoder(nn.Module):
     def __init__(
-            self, n_input=50, exteroceptive=1080, hidden_dim=50,n_layers=2,activation_function="leakyrelu"):
+            self, info, n_input=50, hidden_dim=50,n_layers=2,activation_function="leakyrelu"):
         super(Belief_Decoder,self).__init__()
+        exteroceptive = info["exteroceptive"]
         gate_features = [128,256,512,exteroceptive]
         decoder_features = [128,256,512,exteroceptive]
         self.n_input = n_input
@@ -134,10 +140,13 @@ class Belief_Decoder(nn.Module):
 
 class MLP(nn.Module):
     def __init__(
-            self, proprioceptive=4, belief_dim=60, activation_function="leakyrelu", network_features=[256,160,128], action_space=2):
+            self, info, cfg, belief_dim):
         super(MLP,self).__init__()
         self.network = nn.ModuleList()  # MLP for network
-
+        proprioceptive = info["proprioceptive"]
+        action_space = info["actions"]
+        activation_function = cfg["activation_function"]
+        network_features = cfg["network_features"]
 
         in_channels = proprioceptive + belief_dim
         for feature in network_features:
@@ -159,23 +168,20 @@ class MLP(nn.Module):
 
 class Student(nn.Module):
     def __init__(
-            self, info, hidden_dim=50,n_layers=2,activation_function="leakyrelu", network_features=[512,256,128], encoder_features=[80,60]):
+            self, info):
         super(Student,self).__init__()
-        hidden_dim = 50
-        encoder_features=[80,60]
-        network_features=[256,160,128]
-        decoder_features= 1
-        activation_function = "leakyrelu"
+        cfg = self.cfg()
 
         self.n_re = info["reset"]
         self.n_pr = info["proprioceptive"]
         self.n_ex = info["exteroceptive"]
         self.n_ac = info["actions"]
         
-        self.encoder = Encoder(exteroceptive=self.n_ex, activation_function=activation_function, encoder_features=encoder_features)
-        self.belief_encoder = Belief_Encoder()
-        self.belief_decoder = Belief_Decoder(exteroceptive=self.n_ex)
-        self.MLP = MLP()
+        self.encoder = Encoder(info, cfg["encoder"])
+        encoder_dim = cfg["encoder"]["encoder_features"][-1]
+        self.belief_encoder = Belief_Encoder(info, cfg["belief_encoder"], input_dim=encoder_dim)
+        self.belief_decoder = Belief_Decoder(info)
+        self.MLP = MLP(info, cfg["mlp"], belief_dim=60)
 
     def forward(self, x, h):
         n_ac = self.n_ac
@@ -201,26 +207,29 @@ class Student(nn.Module):
 
         return action, estimated
 
-def cfg():
-    cfg = {
-        "info":{
-            "reset":            0,
-            "actions":          0,
-            "proprioceptive":   0,
-            "exteroceptive":    0,
-            "device": "cuda:0"},
+    def cfg(self):
+        cfg = {
+            "info":{
+                "reset":            0,
+                "actions":          0,
+                "proprioceptive":   0,
+                "exteroceptive":    0,
+            },
+            "encoder":{
+                "activation_function": "leakyrelu",
+                "encoder_features": [80,60]},
 
-        "encoder":{
-            "activation_function": "leakyrelu",
-            "encoder_features": [80,60]},
-
-        "belief_encoder": {
-            "hidden_dim":       50,
-            "n_layers":         2,
-            "activation_function":  "leakyrelu"},
-        "belief_decoder": {},
-        "mlp":{},
-
-            }
-
-            hidden_dim=50,n_layers=2,activation_function="leakyrelu"
+            "belief_encoder": {
+                "hidden_dim":       50,
+                "n_layers":         2,
+                "activation_function":  "leakyrelu"},
+            "belief_decoder": {
+                "activation_function": "leakyrelu"
+            },
+            "mlp":{"activation_function": "leakyrelu",
+                "network_features": [256,160,128],
+                },
+                    
+                }
+        return cfg
+           # hidden_dim=50,n_layers=2,activation_function="leakyrelu"

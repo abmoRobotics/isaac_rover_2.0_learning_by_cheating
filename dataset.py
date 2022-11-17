@@ -7,7 +7,7 @@ class TeacherDataset(Dataset):
     def __init__(self, data_dir):
         sort_data(data_dir)
         self.data = torch.load(data_dir + "data.pt")
-
+        
     def __len__(self):
         return self.data["data"].shape[1]
     
@@ -26,6 +26,7 @@ class TeacherDataset(Dataset):
         return data, gt_ac, gt_ex
     
     def get_info(self):
+        print("KEYS ", self.data["info"].keys())
         return self.data["info"]
 
 
