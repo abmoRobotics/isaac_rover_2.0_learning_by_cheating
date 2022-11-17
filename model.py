@@ -21,7 +21,7 @@ class Layer(nn.Module):
 
 class Encoder(nn.Module):
     def __init__(
-            self, activation_function="leakyrelu", exteroceptive=1080, encoder_features=[80,60], device='cuda:0'):
+            self, exteroceptive=1080, activation_function="leakyrelu", encoder_features=[80,60]):
         super(Encoder,self).__init__()
         self.encoder = nn.ModuleList() 
         in_channels = exteroceptive
@@ -32,15 +32,13 @@ class Encoder(nn.Module):
     def forward(self, x):
         
         for layer in self.encoder:
-            print(layer)
-            print("her")
             x = layer(x)
         
         return x
 
 class Belief_Encoder(nn.Module):
     def __init__(
-            self, proprioceptive=4, input_dim=60, hidden_dim=50,n_layers=2,activation_function="leakyrelu", network_features=[512,256,128], encoder_features=[80,60], device='cuda:0'):
+            self, proprioceptive=4, input_dim=60, hidden_dim=50,n_layers=2,activation_function="leakyrelu"):
         super(Belief_Encoder,self).__init__()
         self.hidden_dim = hidden_dim
         self.n_layers = n_layers
@@ -65,35 +63,15 @@ class Belief_Encoder(nn.Module):
 
         self.ga.append(nn.Sigmoid())
 
-        self.network = nn.ModuleList()  # MLP for network
-        self.encoder = nn.ModuleList()  # Encoder with MLPs for heightmap
-        self.input_dim = input_dim  # External information (Heightmap)
-        self.num_proprioception = proprioceptive
-        action_space=2
-        # Create encoder for heightmap
-        in_channels = self.input_dim
-        for feature in encoder_features:
-            self.encoder.append(Layer(in_channels, feature, activation_function))
-            in_channels = feature
-        
-        # Create MLP
-        in_channels = self.num_proprioception + encoder_features[-1]
-        for feature in network_features:
-            self.network.append(Layer(in_channels, feature, activation_function))
-            in_channels = feature
 
-        self.network.append(nn.Linear(in_channels,action_space))
-        self.network.append(nn.Tanh())
 
     def forward(self, p, l_e, h):
-        print(h)
         # p = proprioceptive
         # e = exteroceptive
         # h = hidden state
         # x = input data, h = hidden state
         #p = p.squeeze()
         #l_e = l_e.squeeze()
-        #print(torch.stack(p,l_e).shape) 
         x = torch.cat((p,l_e),dim=2)
         #x = self.encoder(x)
         out, h = self.gru(x, h)
@@ -117,7 +95,7 @@ class Belief_Encoder(nn.Module):
 
 class Belief_Decoder(nn.Module):
     def __init__(
-            self, n_input=50, exteroceptive=1080, hidden_dim=50,n_layers=2,activation_function="leakyrelu", network_features=[512,256,128], encoder_features=[80,60], device='cuda:0'):
+            self, n_input=50, exteroceptive=1080, hidden_dim=50,n_layers=2,activation_function="leakyrelu"):
         super(Belief_Decoder,self).__init__()
         gate_features = [128,256,512,exteroceptive]
         decoder_features = [128,256,512,exteroceptive]
@@ -149,8 +127,6 @@ class Belief_Decoder(nn.Module):
 
         for layer in self.decoder:
             decoded = layer(decoded)
-        print(e.shape)
-        print(gate.shape)
         x = e*gate
         x = x + decoded
         return x
@@ -158,7 +134,7 @@ class Belief_Decoder(nn.Module):
 
 class MLP(nn.Module):
     def __init__(
-            self, proprioceptive=4, belief_dim=60, activation_function="leakyrelu", network_features=[256,160,128], action_space=2, device='cuda:0'):
+            self, proprioceptive=4, belief_dim=60, activation_function="leakyrelu", network_features=[256,160,128], action_space=2):
         super(MLP,self).__init__()
         self.network = nn.ModuleList()  # MLP for network
 
@@ -183,25 +159,32 @@ class MLP(nn.Module):
 
 class Student(nn.Module):
     def __init__(
-            self, proprioceptive=4, exteroceptive=1913, n_actions=2, hidden_dim=50,n_layers=2,activation_function="leakyrelu", network_features=[512,256,128], encoder_features=[80,60], device='cuda:0'):
+            self, info, hidden_dim=50,n_layers=2,activation_function="leakyrelu", network_features=[512,256,128], encoder_features=[80,60]):
         super(Student,self).__init__()
-        self.encoder = Encoder(exteroceptive=exteroceptive)
-        self.belief_encoder = Belief_Encoder()
-        self.belief_decoder = Belief_Decoder(exteroceptive=exteroceptive)
-        self.MLP = MLP()
-        self.n_p = proprioceptive
-        self.n_e = exteroceptive
-        self.n_a = n_actions
+        hidden_dim = 50
+        encoder_features=[80,60]
+        network_features=[256,160,128]
+        decoder_features= 1
+        activation_function = "leakyrelu"
 
+        self.n_re = info["reset"]
+        self.n_pr = info["proprioceptive"]
+        self.n_ex = info["exteroceptive"]
+        self.n_ac = info["actions"]
+        
+        self.encoder = Encoder(exteroceptive=self.n_ex, activation_function=activation_function, encoder_features=encoder_features)
+        self.belief_encoder = Belief_Encoder()
+        self.belief_decoder = Belief_Decoder(exteroceptive=self.n_ex)
+        self.MLP = MLP()
 
     def forward(self, x, h):
-        n_a = self.n_a
-        n_p = self.n_p
-        reset = x[:,:, 0]
-        actions = x[:,:,1:1+n_a]
-        proprioceptive = x[:,:,1+n_a:1+n_a+n_p]
-        exteroceptive = x[:,:,1+n_a+n_p:]
-        print(x.shape)
+        n_ac = self.n_ac
+        n_pr = self.n_pr
+        n_re = self.n_re
+        reset = x[:,:, 0:n_re]
+        actions = x[:,:,n_re:n_re+n_ac]
+        proprioceptive = x[:,:,n_re+n_ac:n_re+n_ac+n_pr]
+        exteroceptive = x[:,:,n_re+n_ac+n_pr:]
         # n_p = self.n_p
         
         # p = x[:,:,0:n_p]        # Extract proprioceptive information  
@@ -209,7 +192,6 @@ class Student(nn.Module):
         # e = x[:,:,n_p:1084]         # Extract exteroceptive information
         
         e_l = self.encoder(exteroceptive) # Pass exteroceptive information through encoder
-        print("her")
         belief, h = self.belief_encoder(proprioceptive,e_l,h) # extract belief state
         
         estimated = self.belief_decoder(exteroceptive,h)
@@ -218,3 +200,27 @@ class Student(nn.Module):
         action = self.MLP(proprioceptive,belief)
 
         return action, estimated
+
+def cfg():
+    cfg = {
+        "info":{
+            "reset":            0,
+            "actions":          0,
+            "proprioceptive":   0,
+            "exteroceptive":    0,
+            "device": "cuda:0"},
+
+        "encoder":{
+            "activation_function": "leakyrelu",
+            "encoder_features": [80,60]},
+
+        "belief_encoder": {
+            "hidden_dim":       50,
+            "n_layers":         2,
+            "activation_function":  "leakyrelu"},
+        "belief_decoder": {},
+        "mlp":{},
+
+            }
+
+            hidden_dim=50,n_layers=2,activation_function="leakyrelu"
