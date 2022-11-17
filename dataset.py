@@ -30,30 +30,31 @@ class TeacherDataset(Dataset):
         return data, gt_ac, gt_ex
 
     def add_noise(self, gt):
+        # starting with index 3: 0: reset bit 1: action1 2: action2
         noisy_data = gt.clone()
         # dist2goal
-        noise = self.create_rand_tensor(2.0, noisy_data[:, 2].shape)
-        noisy_data[:, 2] = torch.add(noisy_data[:, 2], noise)
-        # heading2goal
         noise = self.create_rand_tensor(2.0, noisy_data[:, 3].shape)
-        noisy_data[:, 3] += torch.add(noisy_data[:, 3], noise)
-        # linear velocity (6?)
-        noise = self.create_rand_tensor(3.0, noisy_data[:, 4].shape)
+        noisy_data[:, 3] = torch.add(noisy_data[:, 3], noise)
+        # heading2goal
+        noise = self.create_rand_tensor(2.0, noisy_data[:, 4].shape)
         noisy_data[:, 4] += torch.add(noisy_data[:, 4], noise)
-        # angular velocity (4?)
+        # linear velocity
         noise = self.create_rand_tensor(3.0, noisy_data[:, 5].shape)
         noisy_data[:, 5] += torch.add(noisy_data[:, 5], noise)
+        # angular velocity
+        noise = self.create_rand_tensor(3.0, noisy_data[:, 6].shape)
+        noisy_data[:, 6] += torch.add(noisy_data[:, 6], noise)
         # heightmap
         noise_mode = self.get_noise_mode()
         noise = self.create_rand_tensor(noise_mode["dev"],
-                                        noisy_data[:, 6:].shape,
+                                        noisy_data[:, 7:].shape,
                                         add_offset=noise_mode["is_add_offset"],
                                         offset=noise_mode["offset"],
                                         is_offset_dev=noise_mode["is_offset_dev"],
                                         offset_dev=noise_mode["offset_dev"])
-        noisy_data[:, 6:] += torch.add(noisy_data[:, 6:], noise)
+        noisy_data[:, 7:] += torch.add(noisy_data[:, 7:], noise)
         if noise_mode["is_missing_points"]:
-            noisy_data[:, 6:] = self.simulate_missing_height_points(noisy_data[:, 6:],
+            noisy_data[:, 7:] = self.simulate_missing_height_points(noisy_data[:, 7:],
                                                                     noise_mode["missing_points_prob"])
         return noisy_data
 
