@@ -62,7 +62,7 @@ class Trainer():
         return total_loss, total_be_loss, total_re_loss
 
     def train(self):
-        wandb.init(project='isaac-rover-2.0-learning-by-cheating', sync_tensorboard=True,name=self.wandb_name,group=self.wandb_name, entity="aalborg-university")
+        wandb.init(project='isaac-rover-2.0-learning-by-cheating', sync_tensorboard=True,name=self.wandb_name,group=self.wandb_group, entity="aalborg-university")
         train_ds = TeacherDataset("data/")
         train_loader = DataLoader(train_ds,batch_size=self.BATCH_SIZE,num_workers=4,pin_memory=True, shuffle=False)
         

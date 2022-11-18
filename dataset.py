@@ -26,6 +26,7 @@ class TeacherDataset(Dataset):
         data[:, re:re + ac] = actions_delayed
         gt_ac = gt[:, re:re + ac]
         gt_ex = gt[:, -ex:]
+        #data = gt
         return data, gt_ac, gt_ex
 
     def add_noise(self, gt):
@@ -36,13 +37,13 @@ class TeacherDataset(Dataset):
         noisy_data[:, 3] = torch.add(noisy_data[:, 3], noise)
         # heading2goal
         noise = self.create_rand_tensor(0.0, noisy_data[:, 4].shape)
-        noisy_data[:, 4] += torch.add(noisy_data[:, 4], noise)
+        noisy_data[:, 4] = torch.add(noisy_data[:, 4], noise)
         # linear velocity
         noise = self.create_rand_tensor(0.0, noisy_data[:, 5].shape)
-        noisy_data[:, 5] += torch.add(noisy_data[:, 5], noise)
+        noisy_data[:, 5] = torch.add(noisy_data[:, 5], noise)
         # angular velocity
         noise = self.create_rand_tensor(0.0, noisy_data[:, 6].shape)
-        noisy_data[:, 6] += torch.add(noisy_data[:, 6], noise)
+        noisy_data[:, 6] = torch.add(noisy_data[:, 6], noise)
         # heightmap
         noise_mode = self.get_noise_mode()
         noise = self.create_rand_tensor(noise_mode["dev"],
@@ -51,7 +52,8 @@ class TeacherDataset(Dataset):
                                         offset=noise_mode["offset"],
                                         is_offset_dev=noise_mode["is_offset_dev"],
                                         offset_dev=noise_mode["offset_dev"])
-        noisy_data[:, 7:] += torch.add(noisy_data[:, 7:], noise)
+        #print("NOISE: " + str(noise))
+        noisy_data[:, 7:] = torch.add(noisy_data[:, 7:], noise)
         if noise_mode["is_missing_points"]:
             noisy_data[:, 7:] = self.simulate_missing_height_points(noisy_data[:, 7:],
                                                                     noise_mode["missing_points_prob"])
