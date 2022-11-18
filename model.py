@@ -100,11 +100,13 @@ class Belief_Encoder(nn.Module):
 
 class Belief_Decoder(nn.Module):
     def __init__(
-            self, info, n_input=50, hidden_dim=50,n_layers=2,activation_function="leakyrelu"):
+            self, info, cfg, n_input=50, hidden_dim=50,n_layers=2,activation_function="leakyrelu"):
         super(Belief_Decoder,self).__init__()
         exteroceptive = info["exteroceptive"]
-        gate_features = [128,256,512, exteroceptive]
-        decoder_features = [128,256,512, exteroceptive]
+        gate_features = cfg["gate_features"] #[128,256,512, exteroceptive]
+        decoder_features = cfg["decoder_features"]#[128,256,512, exteroceptive]
+        gate_features.append(exteroceptive)
+        decoder_features.append(exteroceptive)
         self.n_input = n_input
         self.gate_encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
@@ -133,9 +135,9 @@ class Belief_Decoder(nn.Module):
 
         for layer in self.decoder:
             decoded = layer(decoded)
-        x = e#*gate
-        x = x #+ decoded
-        return e
+        x = e*gate
+        x = x + decoded
+        return x
 
 
 class MLP(nn.Module):
@@ -180,7 +182,7 @@ class Student(nn.Module):
         self.encoder = Encoder(info, cfg["encoder"])
         encoder_dim = cfg["encoder"]["encoder_features"][-1]
         self.belief_encoder = Belief_Encoder(info, cfg["belief_encoder"], input_dim=encoder_dim)
-        self.belief_decoder = Belief_Decoder(info)
+        self.belief_decoder = Belief_Decoder(info, cfg["belief_decoder"])
         self.MLP = MLP(info, cfg["mlp"], belief_dim=60)
 
     def forward(self, x, h):
@@ -227,7 +229,9 @@ class Student(nn.Module):
                 "n_layers":         2,
                 "activation_function":  "leakyrelu"},
             "belief_decoder": {
-                "activation_function": "leakyrelu"
+                "activation_function": "leakyrelu",
+                "gate_features":    [128,256,512],
+                "decoder_features": [128,256,512]
             },
             "mlp":{"activation_function": "leakyrelu",
                 "network_features": [256,160,128]},

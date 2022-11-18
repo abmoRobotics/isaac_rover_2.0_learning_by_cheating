@@ -44,8 +44,8 @@ class Trainer():
                 actions, predictions = model(data,h)
                 loss_be = loss_fn["behaviour"](actions, targets_ac)
                 loss_re = loss_fn["recontruction"](predictions, targets_ex)
-                print(predictions[0,0,0:10]-targets_ex[0,0,0:10])
-                loss = 0.01*loss_be + (0.5 * loss_re)
+                #print(predictions[0,0,0:10]-targets_ex[0,0,0:10])
+                loss = loss_be + (0.5 * loss_re)
                 
             # backward
             optimizer.zero_grad()

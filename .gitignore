@@ -6,3 +6,6 @@ data/data.pt
 wandb
 runs
 data
+__pycache__/dataset.cpython-38.pyc
+__pycache__/model.cpython-38.pyc
+__pycache__/utils.cpython-38.pyc
