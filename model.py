@@ -35,8 +35,6 @@ class Encoder(nn.Module):
     def forward(self, x):
         
         for layer in self.encoder:
-            print(layer)
-            print("her")
             x = layer(x)
         
         return x
@@ -71,7 +69,7 @@ class Belief_Encoder(nn.Module):
         self.ga.append(nn.Sigmoid())
 
     def forward(self, p, l_e, h):
-        print(h)
+        
         # p = proprioceptive
         # e = exteroceptive
         # h = hidden state
@@ -105,8 +103,8 @@ class Belief_Decoder(nn.Module):
             self, info, n_input=50, hidden_dim=50,n_layers=2,activation_function="leakyrelu"):
         super(Belief_Decoder,self).__init__()
         exteroceptive = info["exteroceptive"]
-        gate_features = [128,256,512,exteroceptive]
-        decoder_features = [128,256,512,exteroceptive]
+        gate_features = [128,256,512, exteroceptive]
+        decoder_features = [128,256,512, exteroceptive]
         self.n_input = n_input
         self.gate_encoder = nn.ModuleList()
         self.decoder = nn.ModuleList()
@@ -135,11 +133,9 @@ class Belief_Decoder(nn.Module):
 
         for layer in self.decoder:
             decoded = layer(decoded)
-        print(e.shape)
-        print(gate.shape)
-        x = e*gate
-        x = x + decoded
-        return x
+        x = e#*gate
+        x = x #+ decoded
+        return e
 
 
 class MLP(nn.Module):
@@ -191,11 +187,12 @@ class Student(nn.Module):
         n_ac = self.n_ac
         n_pr = self.n_pr
         n_re = self.n_re
+        n_ac = self.n_ex
         reset = x[:,:, 0:n_re]
         actions = x[:,:,n_re:n_re+n_ac]
         proprioceptive = x[:,:,n_re+n_ac:n_re+n_ac+n_pr]
-        exteroceptive = x[:,:,n_re+n_ac+n_pr:]
-        print(x.shape)
+        exteroceptive = x[:,:,-self.n_ex:]
+        
         # n_p = self.n_p
         
         # p = x[:,:,0:n_p]        # Extract proprioceptive information  
@@ -203,7 +200,7 @@ class Student(nn.Module):
         # e = x[:,:,n_p:1084]         # Extract exteroceptive information
         
         e_l = self.encoder(exteroceptive) # Pass exteroceptive information through encoder
-        print("her")
+
         belief, h = self.belief_encoder(proprioceptive,e_l,h) # extract belief state
         
         estimated = self.belief_decoder(exteroceptive,h)
@@ -233,9 +230,8 @@ class Student(nn.Module):
                 "activation_function": "leakyrelu"
             },
             "mlp":{"activation_function": "leakyrelu",
-                "network_features": [256,160,128],
-                },
-                    
+                "network_features": [256,160,128]},
                 }
+
         return cfg
            # hidden_dim=50,n_layers=2,activation_function="leakyrelu"

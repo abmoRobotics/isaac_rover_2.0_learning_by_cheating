@@ -14,9 +14,9 @@ class Trainer():
         super(Trainer,self).__init__()
         self.LEARNING_RATE = 1e-4 # original 1e-4
         self.DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-        self.NUM_EPOCHS = 10
+        self.NUM_EPOCHS = 150
         self.RUN_NAME = "TEST"
-        self.BATCH_SIZE = 4
+        self.BATCH_SIZE = 8
     
         self.wandb_group = "test-group"
         time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
@@ -37,14 +37,15 @@ class Trainer():
             #TODO format target to be in the correct format
             targets_ac = targets_ac.float().to(device=self.DEVICE)
             targets_ex = targets_ex.float().to(device=self.DEVICE)
-           # print(targets_ac[:,0])
+           
             
             # forward
             with torch.cuda.amp.autocast():
                 actions, predictions = model(data,h)
                 loss_be = loss_fn["behaviour"](actions, targets_ac)
                 loss_re = loss_fn["recontruction"](predictions, targets_ex)
-                loss = loss_be + (0.5 * loss_re)
+                print(predictions[0,0,0:10]-targets_ex[0,0,0:10])
+                loss = 0.01*loss_be + (0.5 * loss_re)
                 
             # backward
             optimizer.zero_grad()
@@ -57,14 +58,14 @@ class Trainer():
             total_loss += loss.item()
             total_be_loss += loss_be
             total_re_loss += loss_re
-
+    
         return total_loss, total_be_loss, total_re_loss
 
     def train(self):
-        wandb.init(project='isaac-rover-2.0-learning-by-cheating', sync_tensorboard=True,name=self.wandb_name,group=self.wandb_group, entity="aalborg-university")
+        wandb.init(project='isaac-rover-2.0-learning-by-cheating', sync_tensorboard=True,name=self.wandb_name,group=self.wandb_name, entity="aalborg-university")
         train_ds = TeacherDataset("data/")
         train_loader = DataLoader(train_ds,batch_size=self.BATCH_SIZE,num_workers=4,pin_memory=True, shuffle=False)
-        print(len(train_loader))
+        
         model = Student(train_ds.get_info()).to(self.DEVICE)
         loss_fn = {
             "behaviour":  nn.MSELoss(reduction="mean"),
@@ -79,7 +80,8 @@ class Trainer():
         for epoch in range(0,self.NUM_EPOCHS):
             
             loss, loss_be, loss_re = self.train_fn(train_loader, model, optimizer, loss_fn, scaler)
-            
+            # print(loss_be/len(train_loader))
+            # print(loss_re/len(train_loader))
              # Reset hidden units after each epoch
 
             # save model
@@ -97,9 +99,9 @@ class Trainer():
                 self.save_checkpoint(checkpoint,self.wandb_name)
 
             # TODO add stuff to wandb or tensorboard
-            wandb.log({"Loss": loss,
-                       "Behaviour loss": loss_be,
-                       "Reconstruction loss": loss_re})
+            wandb.log({"Loss": loss/len(train_loader),
+                       "Behaviour loss": loss_be/len(train_loader),
+                       "Reconstruction loss": loss_re/len(train_loader)})
 
     def save_checkpoint(self, state, dir=""):
         print("=> Saving checkpoint")

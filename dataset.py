@@ -13,7 +13,7 @@ class TeacherDataset(Dataset):
         return self.data["data"].shape[1]
     
     def __getitem__(self, index):
-        max_delay = 5
+        max_delay = 0
         info = self.get_info()
         gt = self.data["data"][:, index]
         data = self.add_noise(gt)
@@ -24,25 +24,25 @@ class TeacherDataset(Dataset):
         actions_delayed = actions_delayed[max_delay:, :]
         data = data[max_delay:, :]
         data[:, re:re + ac] = actions_delayed
-        gt = gt[max_delay:, :]
         gt_ac = gt[:, re:re + ac]
         gt_ex = gt[:, -ex:]
+        data = gt
         return data, gt_ac, gt_ex
 
     def add_noise(self, gt):
         # starting with index 3: 0: reset bit 1: action1 2: action2
         noisy_data = gt.clone()
         # dist2goal
-        noise = self.create_rand_tensor(2.0, noisy_data[:, 3].shape)
+        noise = self.create_rand_tensor(0.0, noisy_data[:, 3].shape)
         noisy_data[:, 3] = torch.add(noisy_data[:, 3], noise)
         # heading2goal
-        noise = self.create_rand_tensor(2.0, noisy_data[:, 4].shape)
+        noise = self.create_rand_tensor(0.0, noisy_data[:, 4].shape)
         noisy_data[:, 4] += torch.add(noisy_data[:, 4], noise)
         # linear velocity
-        noise = self.create_rand_tensor(3.0, noisy_data[:, 5].shape)
+        noise = self.create_rand_tensor(0.0, noisy_data[:, 5].shape)
         noisy_data[:, 5] += torch.add(noisy_data[:, 5], noise)
         # angular velocity
-        noise = self.create_rand_tensor(3.0, noisy_data[:, 6].shape)
+        noise = self.create_rand_tensor(0.0, noisy_data[:, 6].shape)
         noisy_data[:, 6] += torch.add(noisy_data[:, 6], noise)
         # heightmap
         noise_mode = self.get_noise_mode()
@@ -63,30 +63,30 @@ class TeacherDataset(Dataset):
         r = random.random()
         if r <= 0.6:
             # normal noise
-            noise_mode["dev"] = 2.0
+            noise_mode["dev"] = 0.0
             noise_mode["is_add_offset"] = False
             noise_mode["offset"] = 0.0
             noise_mode["is_offset_dev"] = False
             noise_mode["offset_dev"] = False
-            noise_mode["is_missing_points"] = True
+            noise_mode["is_missing_points"] = False
             noise_mode["missing_points_prob"] = 0.1
         elif r <= 0.9:
             # large offsets
-            noise_mode["dev"] = 2.0
-            noise_mode["is_add_offset"] = True
+            noise_mode["dev"] = 0.0
+            noise_mode["is_add_offset"] = False
             noise_mode["offset"] = 5.0
-            noise_mode["is_offset_dev"] = True
+            noise_mode["is_offset_dev"] = False
             noise_mode["offset_dev"] = 1.0
-            noise_mode["is_missing_points"] = True
+            noise_mode["is_missing_points"] = False
             noise_mode["missing_points_prob"] = 0.1
         else:
             # large noise magnitude
-            noise_mode["dev"] = 10.0
+            noise_mode["dev"] = 0.0
             noise_mode["is_add_offset"] = False
             noise_mode["offset"] = 0.0
             noise_mode["is_offset_dev"] = False
             noise_mode["offset_dev"] = False
-            noise_mode["is_missing_points"] = True
+            noise_mode["is_missing_points"] = False
             noise_mode["missing_points_prob"] = 0.1
         return noise_mode
 
@@ -111,7 +111,7 @@ class TeacherDataset(Dataset):
         return new_heights
     
     def get_info(self):
-        print("KEYS ", self.data["info"].keys())
+        # print("KEYS ", self.data["info"].keys())
         return self.data["info"]
 
 
