@@ -26,7 +26,6 @@ class TeacherDataset(Dataset):
         data[:, re:re + ac] = actions_delayed
         gt_ac = gt[:, re:re + ac]
         gt_ex = gt[:, -ex:]
-        data = gt
         return data, gt_ac, gt_ex
 
     def add_noise(self, gt):
