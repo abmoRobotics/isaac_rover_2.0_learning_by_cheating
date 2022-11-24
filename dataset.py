@@ -13,16 +13,17 @@ class TeacherDataset(Dataset):
         return self.data["data"].shape[1]
     
     def __getitem__(self, index):
-        max_delay = 0
+        max_delay = 5
         info = self.get_info()
         gt = self.data["data"][:, index]
         data = self.add_noise(gt)
         # shift actions to simulate random delay for whole rover
         delay = random.randint(0, max_delay)
         re, ac, ex = info["reset"], info["actions"], info["exteroceptive"]
-        actions_delayed = torch.roll(data[:, re:re + ac], delay, 0)
-        actions_delayed = actions_delayed[max_delay:, :]
-        data = data[max_delay:, :]
+        actions_delayed = torch.roll(data[:, re:re + ac], -delay, 0)
+        actions_delayed = actions_delayed[:-max_delay, :]
+        data = data[:-max_delay, :]
+        gt = gt[:-max_delay, :]
         data[:, re:re + ac] = actions_delayed
         gt_ac = gt[:, re:re + ac]
         gt_ex = gt[:, -ex:]
@@ -64,30 +65,30 @@ class TeacherDataset(Dataset):
         r = random.random()
         if r <= 0.6:
             # normal noise
-            noise_mode["dev"] = 0.0
+            noise_mode["dev"] = 2.0
             noise_mode["is_add_offset"] = False
             noise_mode["offset"] = 0.0
             noise_mode["is_offset_dev"] = False
             noise_mode["offset_dev"] = False
-            noise_mode["is_missing_points"] = False
+            noise_mode["is_missing_points"] = True
             noise_mode["missing_points_prob"] = 0.1
         elif r <= 0.9:
             # large offsets
-            noise_mode["dev"] = 0.0
-            noise_mode["is_add_offset"] = False
+            noise_mode["dev"] = 2.0
+            noise_mode["is_add_offset"] = True
             noise_mode["offset"] = 5.0
-            noise_mode["is_offset_dev"] = False
+            noise_mode["is_offset_dev"] = True
             noise_mode["offset_dev"] = 1.0
-            noise_mode["is_missing_points"] = False
+            noise_mode["is_missing_points"] = True
             noise_mode["missing_points_prob"] = 0.1
         else:
             # large noise magnitude
-            noise_mode["dev"] = 0.0
+            noise_mode["dev"] = 10.0
             noise_mode["is_add_offset"] = False
             noise_mode["offset"] = 0.0
             noise_mode["is_offset_dev"] = False
             noise_mode["offset_dev"] = False
-            noise_mode["is_missing_points"] = False
+            noise_mode["is_missing_points"] = True
             noise_mode["missing_points_prob"] = 0.1
         return noise_mode
 
