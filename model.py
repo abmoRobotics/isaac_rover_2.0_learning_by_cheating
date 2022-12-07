@@ -203,8 +203,6 @@ class Student(nn.Module):
         
 
     def forward(self, x, h):
-        print(x.shape)
-        print(h.shape)
         n_ac = self.n_ac
         n_pr = self.n_pr
         n_re = self.n_re

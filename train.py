@@ -43,7 +43,6 @@ class Trainer():
 
             # forward
             with torch.cuda.amp.autocast():
-                print(data.shape)
                 actions, predictions = model(data,h)
                 # torch.save(data[1,13:132],"noisy.pt")
                 # torch.save(predictions[1,13:132],"pred.pt")

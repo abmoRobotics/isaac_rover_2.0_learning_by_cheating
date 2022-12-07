@@ -21,9 +21,9 @@ class TeacherDataset(Dataset):
         delay = random.randint(0, max_delay)
         re, ac, ex = info["reset"], info["actions"], info["sparse"] + info["dense"]
         actions_delayed = torch.roll(data[:, re:re + ac], -delay, 0)
-        actions_delayed = actions_delayed[:-max_delay, :]
-        data = data[:-max_delay, :]
-        gt = gt[:-max_delay, :]
+        actions_delayed = actions_delayed[:-(max_delay+1), :]
+        data = data[:-(max_delay+1), :]
+        gt = gt[:-(max_delay+1), :]
         data[:, re:re + ac] = actions_delayed
         gt_ac = gt[:, re:re + ac]
         gt_ex = gt[:, -ex:]
