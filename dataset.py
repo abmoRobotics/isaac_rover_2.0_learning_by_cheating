@@ -28,6 +28,7 @@ class TeacherDataset(Dataset):
         gt_ac = gt[:, re:re + ac]
         gt_ex = gt[:, -ex:]
         #data = gt
+
         return data, gt_ac, gt_ex
 
     def add_noise(self, gt):
@@ -71,34 +72,34 @@ class TeacherDataset(Dataset):
             noise_mode["is_offset_dev"] = False
             noise_mode["offset_dev"] = False
             noise_mode["is_missing_points"] = True
-            noise_mode["missing_points_prob"] = 0.1
+            noise_mode["missing_points_prob"] = 0.4
         elif r <= 0.9:
             # large offsets
             noise_mode["dev"] = 0.2
-            noise_mode["is_add_offset"] = False #True
-            noise_mode["offset"] = 5.0
-            noise_mode["is_offset_dev"] = False #True
-            noise_mode["offset_dev"] = 1.0
+            noise_mode["is_add_offset"] = False
+            noise_mode["offset"] = 0.0
+            noise_mode["is_offset_dev"] = False
+            noise_mode["offset_dev"] = 0.1
             noise_mode["is_missing_points"] = True
-            noise_mode["missing_points_prob"] = 0.1
+            noise_mode["missing_points_prob"] = 0.4
         else:
             # large noise magnitude
-            noise_mode["dev"] = 0.3
+            noise_mode["dev"] = 0.2
             noise_mode["is_add_offset"] = False 
             noise_mode["offset"] = 0.0
             noise_mode["is_offset_dev"] = False
             noise_mode["offset_dev"] = False
             noise_mode["is_missing_points"] = True
-            noise_mode["missing_points_prob"] = 0.1
+            noise_mode["missing_points_prob"] = 0.4
         return noise_mode
 
     def create_rand_tensor(self, dev, shape, add_offset=False, offset=0, is_offset_dev=False, offset_dev=0.0):
         # not possible to move height points on xy plane
         
         rand = torch.empty(shape).normal_(mean=0,std=dev)
-        #rand = torch.rand(shape)
-        #rand = torch.multiply(rand, dev * 2)
-        #rand = torch.subtract(rand, dev)
+        # rand = torch.rand(shape)
+        # rand = torch.multiply(rand, dev * 2)
+        # rand = torch.subtract(rand, dev)
         #print(rand.shape, rand.mean())
         if add_offset:
             if is_offset_dev:

@@ -160,9 +160,11 @@ class MLP(nn.Module):
         self.log_std_parameter = nn.Parameter(torch.zeros(action_space))
 
     def forward(self, p, belief):
-        
+        # print("hejhej")
+        # print(p.shape)
+        # print(belief.shape)
         x = torch.cat((p,belief),dim=2)
-
+        # print(x.shape)
         for layer in self.network:
             x = layer(x)
         return x, self.log_std_parameter
@@ -183,7 +185,7 @@ class Student(nn.Module):
         self.encoder2 = Encoder(info, cfg["encoder"], encoder="dense")
         encoder_dim = cfg["encoder"]["encoder_features"][-1] * 2
         self.belief_encoder = Belief_Encoder(info, cfg["belief_encoder"], input_dim=encoder_dim)
-        self.belief_decoder = Belief_Decoder(info, cfg["belief_decoder"])
+        self.belief_decoder = Belief_Decoder(info, cfg["belief_decoder"], cfg["belief_encoder"]["hidden_dim"])
         self.MLP = MLP(info, cfg["mlp"], belief_dim=120)
         # Load teacher policy
         teacher_policy = torch.load(teacher)["policy"]
@@ -216,6 +218,8 @@ class Student(nn.Module):
         dense = x[:,:,-n_de:]
         exteroceptive = torch.cat((sparse,dense),dim=2)
 
+        #sparse_gt = gt[:,:,-(n_de+n_sp):-n_de]
+        #dense_gt = gt[:,:,-n_de:]
         # n_p = self.n_p
         
         # p = x[:,:,0:n_p]        # Extract proprioceptive information  
@@ -226,7 +230,12 @@ class Student(nn.Module):
         
         e_l2 = self.encoder2(dense)
         e_l = torch.cat((e_l1,e_l2), dim=2)
+
+        #e_l1_gt = self.encoder1(sparse_gt) # Pass exteroceptive information through encoder
         
+       # e_l2_gt = self.encoder2(dense_gt)
+
+       # gt_ex = torch.cat((e_l1_gt,e_l2_gt), dim=2)
         belief, h, out = self.belief_encoder(proprioceptive,e_l,h) # extract belief state
         
         #estimated = self.belief_decoder(exteroceptive,h)
@@ -251,7 +260,7 @@ class Student(nn.Module):
         # # # sample using the reparameterization trick
         # actions = _g_distribution.rsample()
         #print((actions-action).mean())
-        return actions, estimated
+        return actions, estimated, h#, gt_ex, belief
 
 
            # hidden_dim=50,n_layers=2,activation_function="leakyrelu"
