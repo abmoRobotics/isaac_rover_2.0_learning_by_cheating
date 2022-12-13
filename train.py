@@ -85,11 +85,11 @@ class Trainer():
 
                 total_loss += loss.item() / math.floor(data.shape[1]/horizon)
                 total_be_loss += loss_be / math.floor(data.shape[1]/horizon)
-                #print(total_be_loss)
                 total_re_loss += loss_re / math.floor(data.shape[1]/horizon)
                 total_loss_benchmark += loss_benchmark  
                 h = h.detach()
                 data = data.detach()
+                
                 if i == (math.floor(data.shape[1]/horizon)-1):
                     print(i)
                     if batch_idx == 7:
