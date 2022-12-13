@@ -8,9 +8,10 @@ from torch.utils.data import DataLoader
 import datetime
 import wandb
 import os
+import math
 
 class Trainer():
-    def __init__(self, cfg):
+    def __init__(self, cfg,wandb_name):
         super(Trainer,self).__init__()
         self.cfg = cfg
         cfg_hyperparameters = cfg["learning"]
@@ -22,7 +23,8 @@ class Trainer():
         self.RUN_NAME = "TEST"
         self.wandb_group = "test-group"
         time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        self.wandb_name = f"test-run_{time_str}"
+        #self.wandb_name = f"test-run_{time_str}"
+        self.wandb_name = wandb_name
 
 
     def train_fn(self, train_loader, model, optimizer, loss_fn, scaler):
@@ -33,68 +35,71 @@ class Trainer():
         total_re_loss = 0
         total_loss_benchmark = 0
         
-        
+        #print(1)
         for batch_idx, (data, targets_ac, targets_ex) in enumerate(loop):
+            #print("hej")
             data = data.to(device=self.DEVICE)
             h = model.belief_encoder.init_hidden(self.BATCH_SIZE).to(self.DEVICE)
             #TODO format target to be in the correct format
             targets_ac = targets_ac.float().to(device=self.DEVICE)
             targets_ex = targets_ex.float().to(device=self.DEVICE)
 
-            actions = torch.zeros(self.BATCH_SIZE,data.shape[1], 2,device='cuda:0')
-            predictions = torch.zeros(self.BATCH_SIZE,data.shape[1], data.shape[2]-7,device='cuda:0')
-            # print(predictions.shape)
-            # print(targets_ex.shape)
-            # forward
+            horizon = 100
             
-
-            with torch.cuda.amp.autocast():
-                # print(data.shape)
-                # print(data[:,1].unsqueeze(1).shape)
-
-                #data = torch.cat([data[0:2], data[4:]])
-                #data[:,:,2:4]=0.0
-                actions, predictions, h = model(data,h)
-
-                # for i in range(data.shape[1]-1):
-                #     # if i%10 ==0:
-                #     #     print(i)
-                #     a,p,h = model(data[:,i].unsqueeze(1),h)
-                #     actions[:,i,:]  = a.squeeze()
-                #     predictions[:,i,:] = p.squeeze() # [num_robots, timestep, observations]'
-                #     #print(i)
-                #     # print(p.shape)
-                #     # print(predictions.shape)
-                #     data[:,i+1,2:4] = actions[:,i]
-          
-                loss_be = loss_fn["behaviour"](actions, targets_ac)
-                #print(actions[0,50:70])
-                #print(targets_ac[0,50:70])
-                loss_re = loss_fn["recontruction"](predictions, targets_ex)
-                #loss_re = my_loss(predictions,targets_ex)*100
-                loss_benchmark = loss_fn["recontruction"](data[:,:,7:],targets_ex)
-                loss = 1.0 * loss_be + (0.0000005 * loss_re)
-                #torch.cuda.empty_cache() 
+            for i in range(math.floor(data.shape[1]/horizon)):
+                actions = torch.zeros(self.BATCH_SIZE,horizon, 2,device='cuda:0')
+                predictions = torch.zeros(self.BATCH_SIZE,horizon, data.shape[2]-7,device='cuda:0')
+                # print(predictions.shape)
+                # print(targets_ex[:,i:i+800].shape)
+                # print(data[:,i:i+800,7:].shape)
                 
-            # backward
-            optimizer.zero_grad()
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
-            # update tqdm loop
-            loop.set_postfix(loss=loss.item())
-            if batch_idx == 15:
-                torch.save(predictions[0,100,:].detach(),"predictions.pt")
-                torch.save(data[0,100,7:].detach(),"input.pt")
-                torch.save(targets_ex[0,100,:].detach(),"targets.pt")
-                print("noisey", data[0,100,67:77].detach())
-                print("Predictions", predictions[0,100,60:70].detach())
-                print("GT: ", targets_ex[0,100,60:70].detach()) # [num_robots, timestep, observations]
-                print("Pred Sum", torch.abs(predictions[0,100]).sum())
-            total_loss += loss.item()
-            total_be_loss += loss_be
-            total_re_loss += loss_re
-            total_loss_benchmark += loss_benchmark
+                with torch.cuda.amp.autocast():
+                    actions = torch.zeros(self.BATCH_SIZE,horizon, 2,device='cuda:0')
+                    predictions = torch.zeros(self.BATCH_SIZE,horizon, data.shape[2]-7,device='cuda:0')
+
+
+                    for j in range(horizon):
+
+                        a,p,h = model(data[:,j+i*horizon].unsqueeze(1),h)
+                        actions[:,j,:]  = a.squeeze()
+                        predictions[:,j,:] = p.squeeze() # [num_robots, timestep, observations]
+
+                        data[:,j+i*horizon+1,5:7] = actions[:,j].clone()/3
+
+
+                    loss_be = loss_fn["behaviour"](actions, targets_ac[:,i*horizon:i*horizon+horizon])
+                    loss_re = loss_fn["recontruction"](predictions, targets_ex[:,i*horizon:i*horizon+horizon])
+                    loss_benchmark = loss_fn["recontruction"](data[:,i*horizon:i*horizon+horizon,7:],targets_ex[:,i*horizon:i*horizon+horizon])
+                    loss = 1.0 * loss_be + (0.000000000000000000000000001 * loss_re)
+                    wandb.log({"Loss": loss.item(),
+                        "Behaviour loss": loss_be,
+                        "Reconstruction loss": loss_re,
+                        "Benchmark loss": loss_benchmark},)
+                # backward
+                optimizer.zero_grad()
+                scaler.scale(loss).backward(retain_graph=False)
+                scaler.step(optimizer)
+                scaler.update()
+                loop.set_postfix(loss=loss.item())
+                
+
+                total_loss += loss.item() / math.floor(data.shape[1]/horizon)
+                total_be_loss += loss_be / math.floor(data.shape[1]/horizon)
+                #print(total_be_loss)
+                total_re_loss += loss_re / math.floor(data.shape[1]/horizon)
+                total_loss_benchmark += loss_benchmark  
+                h = h.detach()
+                data = data.detach()
+                if i == (math.floor(data.shape[1]/horizon)-1):
+                    print(i)
+                    if batch_idx == 7:
+                        torch.save(predictions[0,30,:].detach(),"predictions.pt")
+                        torch.save(data[0,30,7:].detach(),"input.pt")
+                        torch.save(targets_ex[0,30,:].detach(),"targets.pt")
+                        print("noisey", data[0,30,67:77].detach())
+                        print("Predictions", predictions[0,30,60:70].detach())
+                        print("GT: ", targets_ex[0,30,60:70].detach()) # [num_robots, timestep, observations]
+                        print("Pred Sum", torch.abs(predictions[0,30]).sum())      
     
         return total_loss, total_be_loss, total_re_loss, total_loss_benchmark
 
@@ -112,18 +117,19 @@ class Trainer():
         parameters=[]
         #parameters.extend(model.encoder.parameters())
         parameters.extend(model.belief_encoder.parameters())
-        parameters.extend(model.belief_decoder.parameters())
-        # parameters.extend(model.encoder1.parameters())
-        # parameters.extend(model.encoder2.parameters())
+       # parameters.extend(model.belief_decoder.parameters())
+        parameters.extend(model.encoder1.parameters())
+        parameters.extend(model.encoder2.parameters())
+        #parameters.extend(model.MLP.parameters())
         # Set MLP.parameters() to false, to avoid accumulating unessecary gradients.
         for param in model.MLP.parameters():
             param.requires_grad = False
-        for param in model.encoder1.parameters():
-            param.requires_grad = False
-        for param in model.encoder2.parameters():
-            param.requires_grad = False
-        # for param in model.belief_decoder.parameters():
+        # for param in model.encoder1.parameters():
         #     param.requires_grad = False
+        # for param in model.encoder2.parameters():
+        #     param.requires_grad = False
+        for param in model.belief_decoder.parameters():
+            param.requires_grad = False
         # Define optimzer
         optimizer = optim.Adam(parameters, lr=self.LEARNING_RATE)
         #optimizer = optim.Adam(model.parameters(), lr=self.LEARNING_RATE)
@@ -155,10 +161,10 @@ class Trainer():
                 self.save_checkpoint(checkpoint,self.wandb_name)
 
             # TODO add stuff to wandb or tensorboard
-            wandb.log({"Loss": loss/len(train_loader),
-                       "Behaviour loss": loss_be/len(train_loader),
-                       "Reconstruction loss": loss_re/len(train_loader),
-                       "Benchmark loss": loss_benchmark/len(train_loader)})
+            # wandb.log({"Loss": loss/len(train_loader),
+            #            "Behaviour loss": loss_be/len(train_loader),
+            #            "Reconstruction loss": loss_re/len(train_loader),
+            #            "Benchmark loss": loss_benchmark/len(train_loader)})
 
     def save_checkpoint(self, state, dir=""):
         print("=> Saving checkpoint")
@@ -182,16 +188,16 @@ def cfg_fn():
             "exteroceptive":    0,
         },
         "learning":{
-            "learning_rate": 1e-4,
-            "epochs": 500,
-            "batch_size": 8,
+            "learning_rate": 3e-4,
+            "epochs": 5,
+            "batch_size": 16,
         },
         "encoder":{
             "activation_function": "leakyrelu",
             "encoder_features": [80,60]},
 
         "belief_encoder": {
-            "hidden_dim":       300,
+            "hidden_dim":       1000,
             "n_layers":         2,
             "activation_function":  "leakyrelu",
             "gb_features": [64,64,120],
@@ -209,25 +215,27 @@ def cfg_fn():
     return cfg
 
 def train():
-    
-    time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    wandb_group = f"test-group_{time_str}"
-    #wandb_group = "test-group"
-    wandb_name = f"test-run_{time_str}"
+    for i in range(5):
+        time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        
+        wandb_group = f"hidden_dim_1000"
+        #wandb_group = "test-group"
+        wandb_name = f"hidden_dim_1000{i}"
 
-    wandb.init(project='isaac-rover-2.0-learning-by-cheating', sync_tensorboard=True, name=wandb_name, group=wandb_group, entity="aalborg-university")
-    cfg = cfg_fn()
-    sweep=False
-    if sweep:
-        #print(wandb.config)
-        cfg["belief_encoder"]["gb_features"] = wandb.config.gb_features
-        cfg["belief_encoder"]["ga_features"] = wandb.config.gb_features
-        cfg["belief_decoder"]["gate_features"] = wandb.config.gate_features
-        cfg["belief_decoder"]["decoder_features"] = wandb.config.gate_features
-        cfg["learning"]["learning_rate"] = wandb.config.lr
-        cfg["learning"]["batch_size"] = wandb.config.batch_size
-    trainer = Trainer(cfg)
-    trainer.train()
+        wandb.init(project='isaac-rover-2.0-learning-by-cheating', sync_tensorboard=True, name=wandb_name, group=wandb_group, entity="aalborg-university")
+        cfg = cfg_fn()
+        sweep=False
+        if sweep:
+            #print(wandb.config)
+            cfg["belief_encoder"]["gb_features"] = wandb.config.gb_features
+            cfg["belief_encoder"]["ga_features"] = wandb.config.gb_features
+            cfg["belief_decoder"]["gate_features"] = wandb.config.gate_features
+            cfg["belief_decoder"]["decoder_features"] = wandb.config.gate_features
+            cfg["learning"]["learning_rate"] = wandb.config.lr
+            cfg["learning"]["batch_size"] = wandb.config.batch_size
+        trainer = Trainer(cfg,wandb_name)
+        trainer.train()
+        wandb.finish()
 
 def my_loss(output: torch.Tensor, target: torch.Tensor):
     x = (output- target)# 1 - output.square()#(torch.square(output))

@@ -8,6 +8,7 @@ class TeacherDataset(Dataset):
     def __init__(self, data_dir):
         sort_data(data_dir)
         self.data = torch.load(data_dir + "data.pt")
+        self.remove_idx = torch.load('remove_idx.pt').to('cpu')
         
     def __len__(self):
         return self.data["data"].shape[1]
@@ -28,6 +29,10 @@ class TeacherDataset(Dataset):
         gt_ac = gt[:, re:re + ac]
         gt_ex = gt[:, -ex:]
         #data = gt
+
+        #data[:, self.remove_idx+7] = 0
+
+
 
         return data, gt_ac, gt_ex
 
