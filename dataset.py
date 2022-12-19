@@ -71,31 +71,31 @@ class TeacherDataset(Dataset):
         r = random.random()
         if r <= 0.6:
             # normal noise
-            noise_mode["dev"] = 0.2
+            noise_mode["dev"] = 0.15
             noise_mode["is_add_offset"] = False
             noise_mode["offset"] = 0.0
             noise_mode["is_offset_dev"] = False
             noise_mode["offset_dev"] = False
             noise_mode["is_missing_points"] = True
-            noise_mode["missing_points_prob"] = 0.4
+            noise_mode["missing_points_prob"] = 0.2
         elif r <= 0.9:
             # large offsets
-            noise_mode["dev"] = 0.2
+            noise_mode["dev"] = 0.05
             noise_mode["is_add_offset"] = False
             noise_mode["offset"] = 0.0
             noise_mode["is_offset_dev"] = False
-            noise_mode["offset_dev"] = 0.1
+            noise_mode["offset_dev"] = 0.02
             noise_mode["is_missing_points"] = True
-            noise_mode["missing_points_prob"] = 0.4
+            noise_mode["missing_points_prob"] = 0.2
         else:
             # large noise magnitude
             noise_mode["dev"] = 0.2
-            noise_mode["is_add_offset"] = False 
+            noise_mode["is_add_offset"] = True 
             noise_mode["offset"] = 0.0
-            noise_mode["is_offset_dev"] = False
-            noise_mode["offset_dev"] = False
+            noise_mode["is_offset_dev"] = True
+            noise_mode["offset_dev"] = 0.02
             noise_mode["is_missing_points"] = True
-            noise_mode["missing_points_prob"] = 0.4
+            noise_mode["missing_points_prob"] = 0.2
         return noise_mode
 
     def create_rand_tensor(self, dev, shape, add_offset=False, offset=0, is_offset_dev=False, offset_dev=0.0):

@@ -44,7 +44,7 @@ class Trainer():
             targets_ac = targets_ac.float().to(device=self.DEVICE)
             targets_ex = targets_ex.float().to(device=self.DEVICE)
 
-            horizon = 100
+            horizon = 50
             
             for i in range(math.floor(data.shape[1]/horizon)):
                 actions = torch.zeros(self.BATCH_SIZE,horizon, 2,device='cuda:0')
@@ -70,7 +70,7 @@ class Trainer():
                     loss_be = loss_fn["behaviour"](actions, targets_ac[:,i*horizon:i*horizon+horizon])
                     loss_re = loss_fn["recontruction"](predictions, targets_ex[:,i*horizon:i*horizon+horizon])
                     loss_benchmark = loss_fn["recontruction"](data[:,i*horizon:i*horizon+horizon,7:],targets_ex[:,i*horizon:i*horizon+horizon])
-                    loss = 1.0 * loss_be + (0.000000000000000000000000001 * loss_re)
+                    loss = 1.0 * loss_be + (0.0000000000000000000000001 * loss_re)
                     wandb.log({"Loss": loss.item(),
                         "Behaviour loss": loss_be,
                         "Reconstruction loss": loss_re,
@@ -188,7 +188,7 @@ def cfg_fn():
             "exteroceptive":    0,
         },
         "learning":{
-            "learning_rate": 3e-4,
+            "learning_rate": 1e-4,
             "epochs": 5,
             "batch_size": 16,
         },
@@ -197,11 +197,11 @@ def cfg_fn():
             "encoder_features": [80,60]},
 
         "belief_encoder": {
-            "hidden_dim":       1000,
+            "hidden_dim":       300,
             "n_layers":         2,
             "activation_function":  "leakyrelu",
-            "gb_features": [64,64,120],
-            "ga_features": [64,64,120]},
+            "gb_features": [128,128,120],
+            "ga_features": [128,128,120]},
 
         "belief_decoder": {
             "activation_function": "leakyrelu",
@@ -218,9 +218,9 @@ def train():
     for i in range(5):
         time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         
-        wandb_group = f"hidden_dim_1000"
+        wandb_group = f"test"
         #wandb_group = "test-group"
-        wandb_name = f"hidden_dim_1000{i}"
+        wandb_name = f"test7"
 
         wandb.init(project='isaac-rover-2.0-learning-by-cheating', sync_tensorboard=True, name=wandb_name, group=wandb_group, entity="aalborg-university")
         cfg = cfg_fn()
