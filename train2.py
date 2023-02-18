@@ -89,11 +89,11 @@ class Trainer():
                         #print(actions.unsqueeze(1))
                         #print(targets_ac[:,i*length:i*length+length].unsqueeze(1))
                         loss_be = loss_fn["behaviour"](actions, targets_ac[:,i*length:i*length+length])
-                        print("hej")
-                        print(actions[0,0:length].shape)
-                        print(targets_ac[0,i*length:i*length+length].shape)
-                        print(actions[0,0:length])
-                        print(targets_ac[0,i*length:i*length+length])
+                        # print("hej")
+                        # print(actions[0,0:length].shape)
+                        # print(targets_ac[0,i*length:i*length+length].shape)
+                        # print(actions[0,0:length])
+                        # print(targets_ac[0,i*length:i*length+length])
                         #print(actions[0])
                         #print(targets_ac[0,i*length:i*length+length])
                         loss_re = loss_fn["recontruction"](predictions, targets_ex[:,i*length:i*length+length])
@@ -118,13 +118,13 @@ class Trainer():
 
                     total_loss += loss.item() / math.floor(data.shape[1]/length)
                     total_be_loss += loss_be / math.floor(data.shape[1]/length)
-                    print(total_be_loss)
+                    # print(total_be_loss)
                     total_re_loss += loss_re / math.floor(data.shape[1]/length)
                     total_loss_benchmark += loss_benchmark  
                     h = h.detach()
                     data = data.detach()
                     if i == (math.floor(data.shape[1]/length)-1):
-                        print(i)
+                        # print(i)
                         if batch_idx == 7:
                             torch.save(predictions[0,30,:].detach(),"predictions.pt")
                             torch.save(data[0,30,7:].detach(),"input.pt")

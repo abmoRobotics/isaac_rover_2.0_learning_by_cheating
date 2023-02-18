@@ -8,6 +8,7 @@ class TeacherDataset(Dataset):
     def __init__(self, data_dir):
         sort_data(data_dir)
         self.data = torch.load(data_dir + "data.pt")
+        self.remove_idx = torch.load('remove_idx.pt').to('cpu')
         
     def __len__(self):
         return self.data["data"].shape[1]
@@ -27,7 +28,10 @@ class TeacherDataset(Dataset):
         data[:, re:re + ac] = actions_delayed
         gt_ac = gt[:, re:re + ac]
         gt_ex = gt[:, -ex:]
-        #data = gt
+        #print(self.remove_idx+7)
+        data[:, self.remove_idx+7] = 0
+        #print(data.shape)
+        #print(data[0,self.remove_idx+7])
 
         return data, gt_ac, gt_ex
 
@@ -66,30 +70,30 @@ class TeacherDataset(Dataset):
         r = random.random()
         if r <= 0.6:
             # normal noise
-            noise_mode["dev"] = 0.2
+            noise_mode["dev"] = 0.2*10
             noise_mode["is_add_offset"] = False
             noise_mode["offset"] = 0.0
             noise_mode["is_offset_dev"] = False
             noise_mode["offset_dev"] = False
-            noise_mode["is_missing_points"] = True
+            noise_mode["is_missing_points"] = False
             noise_mode["missing_points_prob"] = 0.4
         elif r <= 0.9:
             # large offsets
-            noise_mode["dev"] = 0.2
+            noise_mode["dev"] = 0.2*10
             noise_mode["is_add_offset"] = False
             noise_mode["offset"] = 0.0
             noise_mode["is_offset_dev"] = False
             noise_mode["offset_dev"] = 0.1
-            noise_mode["is_missing_points"] = True
+            noise_mode["is_missing_points"] = False
             noise_mode["missing_points_prob"] = 0.4
         else:
             # large noise magnitude
-            noise_mode["dev"] = 0.2
+            noise_mode["dev"] = 0.2*10
             noise_mode["is_add_offset"] = False 
             noise_mode["offset"] = 0.0
             noise_mode["is_offset_dev"] = False
             noise_mode["offset_dev"] = False
-            noise_mode["is_missing_points"] = True
+            noise_mode["is_missing_points"] = False
             noise_mode["missing_points_prob"] = 0.4
         return noise_mode
 
