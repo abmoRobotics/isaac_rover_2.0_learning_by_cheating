@@ -1,1 +1,1 @@
-# isaac_rover_2.0_learning_by_cheating
+# Isaac rover 2.0 learning by cheating

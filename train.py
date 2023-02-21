@@ -46,7 +46,7 @@ class Trainer():
             #TODO format target to be in the correct format
             targets_ac = targets_ac.float().to(device=self.DEVICE)
             targets_ex = targets_ex.float().to(device=self.DEVICE)
-            
+
             horizon = 50
             
             for i in range(math.floor(data.shape[1]/horizon)):
@@ -75,7 +75,7 @@ class Trainer():
                     loss_be = loss_fn["behaviour"](actions, targets_ac[:,i*horizon:i*horizon+horizon])
                     loss_re = loss_fn["recontruction"](predictions, targets_ex[:,i*horizon:i*horizon+horizon])
                     loss_benchmark = loss_fn["recontruction"](data[:,i*horizon:i*horizon+horizon,7:],targets_ex[:,i*horizon:i*horizon+horizon])
-                    loss = 0.0000000000000000000000000000001 * loss_be + (1.0 * loss_re)
+                    loss = 1.0 * loss_be + (0.0000000000000000000000001 * loss_re)
                     wandb.log({"Loss": loss.item(),
                         "Behaviour loss": loss_be,
                         "Reconstruction loss": loss_re,
@@ -202,11 +202,11 @@ def cfg_fn():
             "encoder_features": [1500,1000]},
 
         "belief_encoder": {
-            "hidden_dim":       1200,
+            "hidden_dim":       300,
             "n_layers":         2,
             "activation_function":  "leakyrelu",
-            "gb_features": [128,128,2000],
-            "ga_features": [128,128,2000]},
+            "gb_features": [128,128,120],
+            "ga_features": [128,128,120]},
 
         "belief_decoder": {
             "activation_function": "leakyrelu",

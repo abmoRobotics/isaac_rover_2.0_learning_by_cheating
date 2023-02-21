@@ -1,0 +1,8 @@
+README.md
+setup.py
+rover_learning_by_cheating.egg-info/PKG-INFO
+rover_learning_by_cheating.egg-info/SOURCES.txt
+rover_learning_by_cheating.egg-info/dependency_links.txt
+rover_learning_by_cheating.egg-info/not-zip-safe
+rover_learning_by_cheating.egg-info/requires.txt
+rover_learning_by_cheating.egg-info/top_level.txt
