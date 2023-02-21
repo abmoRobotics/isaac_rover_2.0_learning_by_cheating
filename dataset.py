@@ -14,6 +14,7 @@ class TeacherDataset(Dataset):
         return self.data["data"].shape[1]
     
     def __getitem__(self, index):
+        #print(index)
         max_delay = 0
         info = self.get_info()
         gt = self.data["data"][:, index]
@@ -30,7 +31,7 @@ class TeacherDataset(Dataset):
         gt_ex = gt[:, -ex:]
         #data = gt
 
-        #data[:, self.remove_idx+7] = 0
+        #data[:, self.remove_idx+7] = 
 
 
 
@@ -71,7 +72,7 @@ class TeacherDataset(Dataset):
         r = random.random()
         if r <= 0.6:
             # normal noise
-            noise_mode["dev"] = 0.2
+            noise_mode["dev"] = 0.0
             noise_mode["is_add_offset"] = False
             noise_mode["offset"] = 0.0
             noise_mode["is_offset_dev"] = False
@@ -80,20 +81,20 @@ class TeacherDataset(Dataset):
             noise_mode["missing_points_prob"] = 0.4
         elif r <= 0.9:
             # large offsets
-            noise_mode["dev"] = 0.2
+            noise_mode["dev"] = 0.00
             noise_mode["is_add_offset"] = False
             noise_mode["offset"] = 0.0
             noise_mode["is_offset_dev"] = False
-            noise_mode["offset_dev"] = 0.1
+            noise_mode["offset_dev"] = 0.02
             noise_mode["is_missing_points"] = True
             noise_mode["missing_points_prob"] = 0.4
         else:
             # large noise magnitude
-            noise_mode["dev"] = 0.2
+            noise_mode["dev"] = 0.00
             noise_mode["is_add_offset"] = False 
             noise_mode["offset"] = 0.0
             noise_mode["is_offset_dev"] = False
-            noise_mode["offset_dev"] = False
+            noise_mode["offset_dev"] = 0.00
             noise_mode["is_missing_points"] = True
             noise_mode["missing_points_prob"] = 0.4
         return noise_mode
