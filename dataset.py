@@ -154,12 +154,16 @@ class TeacherDataset(Dataset):
         
         # Generate large hole coordinates
         num_large_gaussian = 3
+        variance_large_gaussian = 2.0
+
         large_gaussian_holes = self.random_points(num_large_gaussian)
 
+        distances = self.grid_dist_to_points(large_gaussian_holes[0])
 
+        large_gaussian = self.gaussian_hole(distances, variance_large_gaussian)
         
-        print("data size: ", data.size())
-        
+        data[:,:,7:] = torch.add(data[:,:,7:], -large_gaussian)
+
     # Generate small gaussian holes
 
         # Generate small hole coordinates
@@ -177,17 +181,17 @@ class TeacherDataset(Dataset):
     # Generate x random points for each instance, distributed within the heightmap view.
     def random_points(self, num_points):
 
-        # Generate the point coordinates from a random uniform distribution
+        # Generate the point coordinates from a random uniform distribution within specified boundaries
         x = torch.FloatTensor(self.num_instances, num_points).uniform_(-2, 2).expand(1, -1,-1)
         y = torch.FloatTensor(self.num_instances, num_points).uniform_(0, 3.5).expand(1, -1,-1)
 
         # Concatenate the individual coordinates to a combined matrix of coordinates
         rand_points = torch.cat((x,y), 0)
 
-        # Swap the axes to be [instances, num_points, 2(x,y)]
-        rand_points = torch.permute(rand_points, (1,2,0))
+        # Swap the axes to be [num_points, instances, 2(x,y)]
+        rand_points = torch.permute(rand_points, (2,1,0))
 
-        return rand_points # Return [512, num_points, 2(x,y)] tensor
+        return rand_points # Return [num_points, 128, 2(x,y)] tensor
 
     # Generate a random point for X instances, distributed outside the heightmap view.
     def random_points_outside(self, instances):
@@ -210,21 +214,28 @@ class TeacherDataset(Dataset):
         
         return rand_points # Return [num_instances, 2(x,y)] tensor
 
-    # Calculate the distance from a single point in each instance heightmap-view(probably 512 of them) to each heightmap point.
+    # Calculate the distance from a single point in each instance heightmap-view(probably 128 of them) to each heightmap point.
     def grid_dist_to_points(self, points):
 
+        a = points # The origin points
+        b = self.heightmap_coordinates[:,:2] # The points to measure distance to the "origin points"
 
-        return 0 # Return [512, 1634] tensor
+        distances = torch.cdist(a.float(), b.float(), p=2.0)
+
+        return distances # Return [instances, 1746] tensor
 
     # Apply the function of a big gaussian hole to the grid_dist points.
-    def gaussian_hole(self, size, dists):
+    def gaussian_hole(self, dists, variance):
 
-        return 0 # Return [512, 1634] tensor
+        # Gaussian function
+        Gaussian = 1/(variance*torch.sqrt(torch.tensor([3.141592]))) * torch.exp(-1/2 * (dists*dists)/(variance*variance))
+
+        return Gaussian # Return [128, 1746] tensor
 
     # Apply the occlusion function to the grid_dist points. Dist sets the distance threshold for occlusion/not occlusion.
     def occlusion(self, dist):
 
-        return 0 # Return [512, 1634] tensor
+        return 0 # Return [128, 1746] tensor
 
 
 if __name__ == "__main__":
