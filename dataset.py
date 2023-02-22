@@ -17,7 +17,8 @@ class TeacherDataset(Dataset):
         self.heightmap = Heightmap('cpu')
 
         self.heightmap_coordinates = self.heightmap.get_coordinates()
-
+        
+        
         # Tool variables
         self.num_instances = self.data["data"].shape[1]
 
@@ -45,8 +46,8 @@ class TeacherDataset(Dataset):
         data[:, re:re + ac] = actions_delayed
         gt_ac = gt[:, re:re + ac]
         gt_ex = gt[:, -ex:]
-        #print(self.remove_idx+7)
-        data[:, self.remove_idx+7] = 0
+        #print(self.remove_idx+7) 
+       # data[:, self.remove_idx+7] = 0 ## REMOVE POINTS IN OCCLUSSION
         #print(data.shape)
         #print(data[0,self.remove_idx+7])
 
