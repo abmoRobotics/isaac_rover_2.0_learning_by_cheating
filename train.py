@@ -37,6 +37,9 @@ class Trainer():
         
         #print(1)
         for batch_idx, (data, targets_ac, targets_ex) in enumerate(loop):
+
+
+
             #print("hej")
             data = data.to(device=self.DEVICE)
             h = model.belief_encoder.init_hidden(self.BATCH_SIZE).to(self.DEVICE)
@@ -56,7 +59,7 @@ class Trainer():
                 with torch.cuda.amp.autocast():
                     actions = torch.zeros(self.BATCH_SIZE,horizon, 2,device='cuda:0')
                     predictions = torch.zeros(self.BATCH_SIZE,horizon, data.shape[2]-7,device='cuda:0')
-
+                    #actions, predictions, h = model(data,h)
 
                     for j in range(horizon):
 
@@ -66,7 +69,9 @@ class Trainer():
 
                         data[:,j+i*horizon+1,5:7] = actions[:,j].clone()/3
 
-
+                   # print("nu")
+                   # print(actions.shape)
+                    #print(targets_ac[:,i*horizon:i*horizon+horizon].shape)
                     loss_be = loss_fn["behaviour"](actions, targets_ac[:,i*horizon:i*horizon+horizon])
                     loss_re = loss_fn["recontruction"](predictions, targets_ex[:,i*horizon:i*horizon+horizon])
                     loss_benchmark = loss_fn["recontruction"](data[:,i*horizon:i*horizon+horizon,7:],targets_ex[:,i*horizon:i*horizon+horizon])
@@ -93,12 +98,12 @@ class Trainer():
                 if i == (math.floor(data.shape[1]/horizon)-1):
                     print(i)
                     if batch_idx == 7:
-                        torch.save(predictions[0,30,:].detach(),"predictions.pt")
-                        torch.save(data[0,30,7:].detach(),"input.pt")
-                        torch.save(targets_ex[0,30,:].detach(),"targets.pt")
-                        print("noisey", data[0,30,67:77].detach())
-                        print("Predictions", predictions[0,30,60:70].detach())
-                        print("GT: ", targets_ex[0,30,60:70].detach()) # [num_robots, timestep, observations]
+                        torch.save(predictions[1,30,:].detach(),"predictions.pt")
+                        torch.save(data[1,30,7:].detach(),"input.pt")
+                        torch.save(targets_ex[1,30,:].detach(),"targets.pt")
+                        print("noisey", data[1,30,67:77].detach())
+                        print("Predictions", predictions[1,30,60:70].detach())
+                        print("GT: ", targets_ex[1,30,60:70].detach()) # [num_robots, timestep, observations]
                         print("Pred Sum", torch.abs(predictions[0,30]).sum())      
     
         return total_loss, total_be_loss, total_re_loss, total_loss_benchmark
@@ -106,7 +111,7 @@ class Trainer():
     def train(self):
         wandb.init(project='isaac-rover-2.0-learning-by-cheating', sync_tensorboard=True,name=self.wandb_name,group=self.wandb_group, entity="aalborg-university")
         train_ds = TeacherDataset("data/")
-        train_loader = DataLoader(train_ds,batch_size=self.BATCH_SIZE,num_workers=4,pin_memory=True, shuffle=False)
+        train_loader = DataLoader(train_ds,batch_size=self.BATCH_SIZE,num_workers=1,pin_memory=True, shuffle=False)
         
         model = Student(info=train_ds.get_info(), cfg=self.cfg, teacher="teacher_model/agent_219000.pt").to(self.DEVICE)
         loss_fn = {
@@ -115,11 +120,11 @@ class Trainer():
         }
         # Define paramters for optimizer
         parameters=[]
-        #parameters.extend(model.encoder.parameters())
+        # parameters.extend(model.encoder.parameters())
         parameters.extend(model.belief_encoder.parameters())
-       # parameters.extend(model.belief_decoder.parameters())
-        parameters.extend(model.encoder1.parameters())
-        parameters.extend(model.encoder2.parameters())
+        # parameters.extend(model.belief_decoder.parameters())
+        # parameters.extend(model.encoder1.parameters())
+        # parameters.extend(model.encoder2.parameters())
         #parameters.extend(model.MLP.parameters())
         # Set MLP.parameters() to false, to avoid accumulating unessecary gradients.
         for param in model.MLP.parameters():
@@ -190,11 +195,11 @@ def cfg_fn():
         "learning":{
             "learning_rate": 1e-4,
             "epochs": 5,
-            "batch_size": 16,
+            "batch_size": 8,
         },
         "encoder":{
             "activation_function": "leakyrelu",
-            "encoder_features": [80,60]},
+            "encoder_features": [1500,1000]},
 
         "belief_encoder": {
             "hidden_dim":       300,
@@ -205,8 +210,8 @@ def cfg_fn():
 
         "belief_decoder": {
             "activation_function": "leakyrelu",
-            "gate_features":    [128,256,512],
-            "decoder_features": [128,256,512]
+            "gate_features":    [1000,1500],
+            "decoder_features": [1000,1500]
         },
         "mlp":{"activation_function": "leakyrelu",
             "network_features": [256,160,128]},
@@ -217,6 +222,7 @@ def cfg_fn():
 def train():
     for i in range(5):
         time_str = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        
         
         wandb_group = f"test"
         #wandb_group = "test-group"

@@ -2,6 +2,7 @@ from torch.utils.data import Dataset
 import random
 from utils import sort_data
 import torch
+import math
 from heightmap_distribution import Heightmap
 
 # TODO add noises to dataset
@@ -17,9 +18,11 @@ class TeacherDataset(Dataset):
         self.heightmap = Heightmap('cpu')
 
         self.heightmap_coordinates = self.heightmap.get_coordinates()
-
+        
+        
         # Tool variables
         self.num_instances = self.data["data"].shape[1]
+        self.timesteps = self.data["data"].shape[0] 
 
         # Add initial noise to data
         self.data["data"] = self.add_static_noise(self.data["data"])
@@ -30,6 +33,7 @@ class TeacherDataset(Dataset):
     
     # Index is the robot instance.
     def __getitem__(self, index):
+        #print(index)
         max_delay = 0
         info = self.get_info()
         gt = self.data["data"][:, index]
@@ -44,13 +48,18 @@ class TeacherDataset(Dataset):
         data[:, re:re + ac] = actions_delayed
         gt_ac = gt[:, re:re + ac]
         gt_ex = gt[:, -ex:]
-        #print(self.remove_idx+7)
-        data[:, self.remove_idx+7] = 0
-        #print(data.shape)
-        #print(data[0,self.remove_idx+7])
+        # print(self.remove_idx+7) 
+        # data[:, self.remove_idx+7] = 0 ## REMOVE POINTS IN OCCLUSSION
+        # print(data.shape)
+        # print(data[0,self.remove_idx+7])
 
-        #data[:, self.remove_idx+7] = 0
-
+        # data[:, self.remove_idx+7] = 
+        NEW_NOISE_LEVELS = True
+        if NEW_NOISE_LEVELS:
+            # Add offset
+            gt_ex += self.offset_z(gt_ex)
+            # Add rotation
+            gt_ex += self.rotate()
 
 
         return data, gt_ac, gt_ex
@@ -240,12 +249,38 @@ class TeacherDataset(Dataset):
 
     # Apply the occlusion function to the grid_dist points. Dist sets the distance threshold for occlusion/not occlusion.
     def occlusion(self, dist, inflation):
-
+        
         # Distance funcion. True when not occluded, False when occluded.
         occluded = torch.where(dist > inflation, torch.ones_like(dist), torch.zeros_like(dist))
 
         return occluded # Return [128, 1746] tensor
 
+    
+    def rotate(self, max_angle: float = 3.14/18, bidirectional: bool = True) -> torch.Tensor:
+        XY_coordinates = self.heightmap_coordinates[:, 0:2]
+        # Creates a random rotation
+        if bidirectional:
+            XY_randomNumber = (torch.rand(1,2)*max_angle*2) - max_angle
+        else:
+            XY_randomNumber = torch.rand(1,2)*max_angle
+
+        XY_translation = XY_coordinates * torch.tan(XY_randomNumber) # a = tanA * b
+        Z_translation = torch.sum(XY_translation, dim = 1) # Sum translation from X and Y rotation
+
+        Z_translation = Z_translation.repeat(self.timesteps,1) # Repeat for each timestep, because the rotation is constant
+        return Z_translation 
+    
+    def offset_z(self, input_tensor: torch.Tensor, offset: float = 0.05, bidirectional: bool = True):
+        # Creates an offset of the same size as input tensor
+        if bidirectional:
+            randomNumber = (random.random()*offset*2) - offset
+        else:
+            randomNumber = random.random()*offset
+
+        # Generate offset tensor
+        offset_tensor = torch.ones_like(input_tensor) * randomNumber
+        Z_translation = Z_translation.repeat(self.timesteps,1) # Repeat for each timestep, because the offset is constant
+        return offset_tensor 
 
 if __name__ == "__main__":
     a = TeacherDataset("data/")
