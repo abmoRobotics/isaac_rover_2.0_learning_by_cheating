@@ -171,7 +171,13 @@ class TeacherDataset(Dataset):
         smaller_gaussian_holes = self.random_points_outside(data)
 
 
+    # Generate moving occlusions
 
+        occlusion_points = self.random_points(3)
+        occlusion_distances = self.grid_dist_to_points(occlusion_points[0])
+        occlusion = self.occlusion(occlusion_distances, 0.2)
+
+        data[:,:,7:] = data[:,:,7:] * occlusion
 
         noisy_data = data
 
@@ -224,7 +230,7 @@ class TeacherDataset(Dataset):
 
         return distances # Return [instances, 1746] tensor
 
-    # Apply the function of a big gaussian hole to the grid_dist points.
+    # Apply the function of a gaussian hole to the grid_dist points.
     def gaussian_hole(self, dists, variance):
 
         # Gaussian function
@@ -233,9 +239,12 @@ class TeacherDataset(Dataset):
         return Gaussian # Return [128, 1746] tensor
 
     # Apply the occlusion function to the grid_dist points. Dist sets the distance threshold for occlusion/not occlusion.
-    def occlusion(self, dist):
+    def occlusion(self, dist, inflation):
 
-        return 0 # Return [128, 1746] tensor
+        # Distance funcion. True when not occluded, False when occluded.
+        occluded = torch.where(dist > inflation, torch.ones_like(dist), torch.zeros_like(dist))
+
+        return occluded # Return [128, 1746] tensor
 
 
 if __name__ == "__main__":
