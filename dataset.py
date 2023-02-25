@@ -163,30 +163,58 @@ class TeacherDataset(Dataset):
         
         # Generate large hole coordinates
         num_large_gaussian = 3
-        variance_large_gaussian = 2.0
+        variance_large_gaussian = 4.0
 
         large_gaussian_holes = self.random_points(num_large_gaussian)
 
-        distances = self.grid_dist_to_points(large_gaussian_holes[0])
+        for i in range(len(large_gaussian_holes)):
+            large_distances = self.grid_dist_to_points(large_gaussian_holes[i])
 
-        large_gaussian = self.gaussian_hole(distances, variance_large_gaussian)
-        
-        data[:,:,7:] = torch.add(data[:,:,7:], -large_gaussian)
+            large_gaussian = self.gaussian_hole(large_distances, variance_large_gaussian)
+            
+            data[:,:,7:] = torch.add(data[:,:,7:], -large_gaussian)
 
     # Generate small gaussian holes
 
-        # Generate small hole coordinates
-        num_small_gaussian = 4
-        smaller_gaussian_holes = self.random_points_outside(data)
+        # # Generate small hole coordinates
+        # num_small_gaussian = 4
+        # variance_small_gaussian = 1.0
 
+        # small_gaussian_holes = self.random_points_outside(data)
+        
+        # small_distances = self.grid_dist_to_points(small_gaussian_holes)
+
+        # small_gaussian = self.gaussian_hole(small_distances, variance_small_gaussian)
+        
+        # data[:,:,7:] = torch.add(data[:,:,7:], -small_gaussian)
 
     # Generate moving occlusions
 
-        occlusion_points = self.random_points(3)
-        occlusion_distances = self.grid_dist_to_points(occlusion_points[0])
-        occlusion = self.occlusion(occlusion_distances, 0.2)
+        num_moving_occlusions = 1 # MUST BE 1! Otherwise the code doesn't work...
 
-        data[:,:,7:] = data[:,:,7:] * occlusion
+        # Check the ammount of points that each rover has
+        # For each rover that has less than x moving occlusions, generate a new one, and a new direction
+
+        occlusion_points = self.random_points_outside(data.size()[1], num_moving_occlusions)
+        random_directions = self.random_directions(data[0,:], num_moving_occlusions)
+
+        for i in range(len(data)):
+            # Move the occlusion in a direction
+            occlusion_points = self.move_points(occlusion_points, random_directions)
+
+
+            # If the occlusion is outside the limit, delete it. x = 0, y = 1
+            outside = torch.where(torch.logical_or(occlusion_points[:,0] < -2, occlusion_points[:,0] > 2), True, False)
+            outside = torch.where(torch.logical_or(occlusion_points[:,1] < -1, occlusion_points[:,1] > 4), True, outside)
+
+            outside_idx = torch.nonzero(outside, as_tuple=False) 
+
+            occlusion_points[outside_idx] = self.random_points_outside(outside_idx.size()[0],num_moving_occlusions).unsqueeze(1)
+
+            occlusion_distances = self.grid_dist_to_points(occlusion_points)
+            occlusion = self.occlusion(occlusion_distances, 0.2)
+
+            data[i,:,7:] = data[i,:,7:] * occlusion
 
         noisy_data = data
 
@@ -209,25 +237,36 @@ class TeacherDataset(Dataset):
         return rand_points # Return [num_points, 128, 2(x,y)] tensor
 
     # Generate a random point for X instances, distributed outside the heightmap view.
-    def random_points_outside(self, instances):
-        
-        num_points = 1
+    def random_points_outside(self, num_instances, num_points):
 
         # Generate the point coordinates from a random uniform distribution
-        x = torch.FloatTensor(instances.size()[1], num_points).uniform_(-2, 2)
-        y = torch.FloatTensor(instances.size()[1], num_points).uniform_(0, 3.5)
+        x = torch.FloatTensor(num_instances, num_points).uniform_(-2, 2)
+        y = torch.FloatTensor(num_instances, num_points).uniform_(0, 3.5)
 
         # Generate bool for placement of border point. True is on the left and right edge. False is on the front and rear edge.
-        side = torch.FloatTensor(instances.size()[1], 1).uniform_() > 0.5
+        side = torch.FloatTensor(num_instances, 1).uniform_() > 0.5
 
         # Set x and y coordinates based on side boolean variable.
-        x = torch.where(side, torch.where(x < 0, -2, 2), x)
-        y = torch.where(side, y, torch.where(y < 1.5, -1, 4))
+        x = torch.where(side, torch.where(x < 0, -1.99, 1.99), x)
+        y = torch.where(side, y, torch.where(y < 1.5, -0.99, 3.99))
 
         # Concatenate the individual coordinates to a combined matrix of coordinates
-        rand_points = torch.cat((x,y), 1)
-        
-        return rand_points # Return [num_instances, 2(x,y)] tensor
+        rand_points = torch.cat((x, y), 1)
+
+        return rand_points  # Return [num_instances, 2(x,y)] tensor
+
+    def random_directions(self, instances, num_directions):
+
+        # Genereate af random direction for each instance. 0.055 m/timestep is physical maximum speed for the rover.
+        x = torch.FloatTensor(
+            instances.size()[0], num_directions).uniform_(-0.06, 0.06)
+        y = torch.FloatTensor(
+            instances.size()[0], num_directions).uniform_(-0.06, 0.06)
+
+        # Concatenate the individual coordinates to a combined matrix of directions
+        rand_directions = torch.cat((x, y), 1)
+
+        return rand_directions
 
     # Calculate the distance from a single point in each instance heightmap-view(probably 128 of them) to each heightmap point.
     def grid_dist_to_points(self, points):
@@ -255,32 +294,36 @@ class TeacherDataset(Dataset):
 
         return occluded # Return [128, 1746] tensor
 
+    # Move points in a random direction
+    def move_points(self, points, directions):
+        return points + directions
+
     
-    def rotate(self, max_angle: float = 3.14/18, bidirectional: bool = True) -> torch.Tensor:
-        XY_coordinates = self.heightmap_coordinates[:, 0:2]
-        # Creates a random rotation
-        if bidirectional:
-            XY_randomNumber = (torch.rand(1,2)*max_angle*2) - max_angle
-        else:
-            XY_randomNumber = torch.rand(1,2)*max_angle
+    # def rotate(self, max_angle: float = 3.14/18, bidirectional: bool = True) -> torch.Tensor:
+    #     XY_coordinates = self.heightmap_coordinates[:, 0:2]
+    #     # Creates a random rotation
+    #     if bidirectional:
+    #         XY_randomNumber = (torch.rand(1,2)*max_angle*2) - max_angle
+    #     else:
+    #         XY_randomNumber = torch.rand(1,2)*max_angle
 
-        XY_translation = XY_coordinates * torch.tan(XY_randomNumber) # a = tanA * b
-        Z_translation = torch.sum(XY_translation, dim = 1) # Sum translation from X and Y rotation
+    #     XY_translation = XY_coordinates * torch.tan(XY_randomNumber) # a = tanA * b
+    #     Z_translation = torch.sum(XY_translation, dim = 1) # Sum translation from X and Y rotation
 
-        Z_translation = Z_translation.repeat(self.timesteps,1) # Repeat for each timestep, because the rotation is constant
-        return Z_translation 
+    #     Z_translation = Z_translation.repeat(self.timesteps,1) # Repeat for each timestep, because the rotation is constant
+    #     return Z_translation 
     
-    def offset_z(self, input_tensor: torch.Tensor, offset: float = 0.05, bidirectional: bool = True):
-        # Creates an offset of the same size as input tensor
-        if bidirectional:
-            randomNumber = (random.random()*offset*2) - offset
-        else:
-            randomNumber = random.random()*offset
+    # def offset_z(self, input_tensor: torch.Tensor, offset: float = 0.05, bidirectional: bool = True):
+    #     # Creates an offset of the same size as input tensor
+    #     if bidirectional:
+    #         randomNumber = (random.random()*offset*2) - offset
+    #     else:
+    #         randomNumber = random.random()*offset
 
-        # Generate offset tensor
-        offset_tensor = torch.ones_like(input_tensor) * randomNumber
-        Z_translation = Z_translation.repeat(self.timesteps,1) # Repeat for each timestep, because the offset is constant
-        return offset_tensor 
+    #     # Generate offset tensor
+    #     offset_tensor = torch.ones_like(input_tensor) * randomNumber
+    #     Z_translation = Z_translation.repeat(self.timesteps,1) # Repeat for each timestep, because the offset is constant
+    #     return offset_tensor 
 
 if __name__ == "__main__":
     a = TeacherDataset("data/")
