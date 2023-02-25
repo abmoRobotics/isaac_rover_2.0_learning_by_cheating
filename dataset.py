@@ -19,13 +19,7 @@ class TeacherDataset(Dataset):
 
         self.heightmap_coordinates = self.heightmap.get_coordinates()
         
-        
-        # Tool variables
-        self.num_instances = self.data["data"].shape[1]
         self.timesteps = self.data["data"].shape[0] 
-
-        # Add initial noise to data
-        self.data["data"] = self.add_static_noise(self.data["data"])
 
         
     def __len__(self):
@@ -57,10 +51,14 @@ class TeacherDataset(Dataset):
         NEW_NOISE_LEVELS = True
         if NEW_NOISE_LEVELS:
             # Add offset
-            gt_ex += self.offset_z(gt_ex)
+            #gt_ex += self.offset_z(gt_ex)
             # Add rotation
-            gt_ex += self.rotate()
+            #gt_ex += self.rotate()
+                    # Add initial noise to data
+            #gt_ex = self.add_static_noise(gt_ex)
+            gt_ex = self.add_large_noise(gt_ex)
 
+            gt_ex = self.add_occlusions(gt_ex)
 
         return data, gt_ac, gt_ex
 
@@ -153,14 +151,9 @@ class TeacherDataset(Dataset):
         # print("KEYS ", self.data["info"].keys())
         return self.data["info"]
 
-    # Add Static noise to data.
-    def add_static_noise(self, data):
+    # Add large gaussian noise to data.
+    def add_large_noise(self, data):
 
-        if self.debug:
-            print(self.num_instances, " instances in dataset")
-
-    # Generate large gaussian holes
-        
         # Generate large hole coordinates
         num_large_gaussian = 3
         variance_large_gaussian = 4.0
@@ -172,31 +165,19 @@ class TeacherDataset(Dataset):
 
             large_gaussian = self.gaussian_hole(large_distances, variance_large_gaussian)
             
-            data[:,:,7:] = torch.add(data[:,:,7:], -large_gaussian)
+            data = torch.add(data, -large_gaussian)
 
-    # Generate small gaussian holes
-
-        # # Generate small hole coordinates
-        # num_small_gaussian = 4
-        # variance_small_gaussian = 1.0
-
-        # small_gaussian_holes = self.random_points_outside(data)
-        
-        # small_distances = self.grid_dist_to_points(small_gaussian_holes)
-
-        # small_gaussian = self.gaussian_hole(small_distances, variance_small_gaussian)
-        
-        # data[:,:,7:] = torch.add(data[:,:,7:], -small_gaussian)
+        return data
 
     # Generate moving occlusions
-
+    def add_occlusions(self, data):
         num_moving_occlusions = 1 # MUST BE 1! Otherwise the code doesn't work...
 
         # Check the ammount of points that each rover has
         # For each rover that has less than x moving occlusions, generate a new one, and a new direction
 
-        occlusion_points = self.random_points_outside(data.size()[1], num_moving_occlusions)
-        random_directions = self.random_directions(data[0,:], num_moving_occlusions)
+        occlusion_points = self.random_points_outside(num_moving_occlusions)
+        random_directions = self.random_directions(num_moving_occlusions)
 
         for i in range(len(data)):
             # Move the occlusion in a direction
@@ -209,24 +190,22 @@ class TeacherDataset(Dataset):
 
             outside_idx = torch.nonzero(outside, as_tuple=False) 
 
-            occlusion_points[outside_idx] = self.random_points_outside(outside_idx.size()[0],num_moving_occlusions).unsqueeze(1)
+            occlusion_points[outside_idx] = self.random_points_outside(num_moving_occlusions).unsqueeze(1)
 
             occlusion_distances = self.grid_dist_to_points(occlusion_points)
             occlusion = self.occlusion(occlusion_distances, 0.2)
 
-            data[i,:,7:] = data[i,:,7:] * occlusion
+            data = data * occlusion
 
-        noisy_data = data
-
-        return noisy_data
+        return data
     
     
     # Generate x random points for each instance, distributed within the heightmap view.
     def random_points(self, num_points):
 
         # Generate the point coordinates from a random uniform distribution within specified boundaries
-        x = torch.FloatTensor(self.num_instances, num_points).uniform_(-2, 2).expand(1, -1,-1)
-        y = torch.FloatTensor(self.num_instances, num_points).uniform_(0, 3.5).expand(1, -1,-1)
+        x = torch.FloatTensor(1, num_points).uniform_(-2, 2).expand(1, -1,-1)
+        y = torch.FloatTensor(1, num_points).uniform_(0, 3.5).expand(1, -1,-1)
 
         # Concatenate the individual coordinates to a combined matrix of coordinates
         rand_points = torch.cat((x,y), 0)
@@ -237,14 +216,14 @@ class TeacherDataset(Dataset):
         return rand_points # Return [num_points, 128, 2(x,y)] tensor
 
     # Generate a random point for X instances, distributed outside the heightmap view.
-    def random_points_outside(self, num_instances, num_points):
+    def random_points_outside(self, num_points):
 
         # Generate the point coordinates from a random uniform distribution
-        x = torch.FloatTensor(num_instances, num_points).uniform_(-2, 2)
-        y = torch.FloatTensor(num_instances, num_points).uniform_(0, 3.5)
+        x = torch.FloatTensor(1, num_points).uniform_(-2, 2)
+        y = torch.FloatTensor(1, num_points).uniform_(0, 3.5)
 
         # Generate bool for placement of border point. True is on the left and right edge. False is on the front and rear edge.
-        side = torch.FloatTensor(num_instances, 1).uniform_() > 0.5
+        side = torch.FloatTensor(1, 1).uniform_() > 0.5
 
         # Set x and y coordinates based on side boolean variable.
         x = torch.where(side, torch.where(x < 0, -1.99, 1.99), x)
@@ -255,13 +234,11 @@ class TeacherDataset(Dataset):
 
         return rand_points  # Return [num_instances, 2(x,y)] tensor
 
-    def random_directions(self, instances, num_directions):
+    def random_directions(self, num_directions):
 
         # Genereate af random direction for each instance. 0.055 m/timestep is physical maximum speed for the rover.
-        x = torch.FloatTensor(
-            instances.size()[0], num_directions).uniform_(-0.06, 0.06)
-        y = torch.FloatTensor(
-            instances.size()[0], num_directions).uniform_(-0.06, 0.06)
+        x = torch.FloatTensor(1, num_directions).uniform_(-0.06, 0.06)
+        y = torch.FloatTensor(1, num_directions).uniform_(-0.06, 0.06)
 
         # Concatenate the individual coordinates to a combined matrix of directions
         rand_directions = torch.cat((x, y), 1)
