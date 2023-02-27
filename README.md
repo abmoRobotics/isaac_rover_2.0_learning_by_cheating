@@ -3,4 +3,3 @@ This repository contains the code needed to train a student agent based on data 
 
 For more details please refer to our paper.
 
-## Dataset
